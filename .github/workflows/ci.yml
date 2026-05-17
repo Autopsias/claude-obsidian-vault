@@ -27,9 +27,9 @@ jobs:
           assert len(data['plugins']) > 0, 'plugins list is empty'
 
           for p in data['plugins']:
-              assert 'id' in p, f'plugin missing id: {p}'
               assert 'name' in p, f'plugin missing name: {p}'
-              assert 'path' in p, f'plugin missing path: {p}'
+              assert 'source' in p, f'plugin missing source: {p}'
+              assert 'description' in p, f'plugin missing description: {p}'
 
           print(f'marketplace.json OK — {len(data[\"plugins\"])} plugins')
           "
