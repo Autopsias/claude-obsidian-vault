@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vault-skills",
+  "version": "0.1.0",
+  "description": "Active-maintenance skill bundle for the disciplined Obsidian vault — kb-curator (audit/lint/refresh-index), plan-builder (HTML session-tracker dashboards), save-conversation (chat→typed vault note with quality filter), autoresearch-loop (Karpathy-style scored optimisation of any text artefact).",
+  "author": {
+    "name": "Ricardo Carvalho",
+    "email": "ricacarvalho@gmail.com"
+  },
+  "homepage": "https://github.com/Autopsias/claude-obsidian-vault",
+  "repository": "https://github.com/Autopsias/claude-obsidian-vault",
+  "license": "MIT",
+  "keywords": ["obsidian", "maintenance", "audit", "planning", "autoresearch"]
+}

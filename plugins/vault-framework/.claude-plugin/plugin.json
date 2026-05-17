@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vault-framework",
+  "version": "0.1.0",
+  "description": "The disciplined Obsidian-vault kernel: CLAUDE.md template, 9-rule operating guide, 8 .claude/rules disciplines, 8 Bases templates, /vault-setup path-detecting scaffolder, /hot orientation surface, /promote workspace→typed-zone ritual.",
+  "author": {
+    "name": "Ricardo Carvalho",
+    "email": "ricacarvalho@gmail.com"
+  },
+  "homepage": "https://github.com/Autopsias/claude-obsidian-vault",
+  "repository": "https://github.com/Autopsias/claude-obsidian-vault",
+  "license": "MIT",
+  "keywords": ["obsidian", "vault", "knowledge-base", "retrieval", "operating-guide", "scaffold"]
+}

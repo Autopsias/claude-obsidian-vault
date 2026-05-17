@@ -1,0 +1,21 @@
+filters:
+  and:
+    - type == "decision"
+views:
+  - type: table
+    name: All Decisions
+    order:
+      - property: date
+        direction: desc
+  - type: table
+    name: Active Decisions
+    filters:
+      and:
+        - status == "active"
+  - type: table
+    name: By Project
+    groupBy:
+      property: project
+    order:
+      - property: date
+        direction: desc

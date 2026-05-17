@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vault-voice",
+  "version": "0.1.0",
+  "description": "Personal-voice layer for the disciplined Obsidian vault — voice-profile.md template, voice-discipline auto-load rule, populate-voice-profile.py corpus extractor. Compounds with the universal writing-craft layer (Pyramid Principle, BLUF, SCQA, clarity rules) so Claude drafts under your name without sounding like Claude.",
+  "author": {
+    "name": "Ricardo Carvalho",
+    "email": "ricacarvalho@gmail.com"
+  },
+  "homepage": "https://github.com/Autopsias/claude-obsidian-vault",
+  "repository": "https://github.com/Autopsias/claude-obsidian-vault",
+  "license": "MIT",
+  "keywords": ["voice", "writing", "style-guide", "drafting", "obsidian"]
+}

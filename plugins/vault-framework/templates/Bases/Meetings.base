@@ -1,0 +1,17 @@
+filters:
+  and:
+    - type == "meeting"
+views:
+  - type: table
+    name: Recent Meetings
+    order:
+      - property: date
+        direction: desc
+    limit: 20
+  - type: table
+    name: By Project
+    groupBy:
+      property: projects
+    order:
+      - property: date
+        direction: desc

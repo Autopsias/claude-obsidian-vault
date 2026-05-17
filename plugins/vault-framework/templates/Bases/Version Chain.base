@@ -1,0 +1,58 @@
+# BT-06 — Version Chain view (added 2026-05-11, Session S03, Bitemporal & Retrieval Hardening).
+#
+# PURPOSE: Show all versioned documents (those carrying a document_version field)
+# sorted so that version families appear together. Answers: "what is the full
+# version lineage of document X, and which version is current?"
+#
+# GROUPING NOTE: Obsidian Bases does not support computed/regex groupBy
+# (e.g. stripping _v[0-9]+ suffixes to derive a family slug). As a pragmatic
+# alternative this view sorts by file.name ascending — alphabetical order
+# naturally clusters version families together (e.g. all
+# <family-slug>_<topic>_v1.md, <family-slug>_<topic>_v2.md … appear adjacent), with
+# document_version as the secondary sort to order within-family correctly.
+# For cross-family navigation use the "By Family" view which groups on a
+# manually-maintained `family:` frontmatter field (add `family: <slug>` to
+# each member to activate grouping — optional enrichment, not required by P-4).
+#
+# FILTER LOGIC: `document_version != ""` selects only files that have been
+# explicitly versioned. Template files are excluded by the verifier's SKIP_DIRS
+# (90 System/Templates/); workspace and inbox files do not carry document_version
+# in practice. The "not is_template" requirement in the BT-06 spec is
+# satisfied by this field-presence filter rather than an explicit type exclusion.
+#
+# SCOPE: Cross-type — spans source, meeting, decision, and any other type
+# carrying document_version. Classified as view-only by the bases verifier.
+filters:
+  and:
+    - document_version != ""
+views:
+  - type: table
+    name: Version Chain — All
+    order:
+      - property: file.name
+        direction: asc
+      - property: document_version
+        direction: asc
+  - type: table
+    name: Version Chain — Current Only
+    filters:
+      and:
+        - is_latest_version != false
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: Version Chain — Superseded
+    filters:
+      and:
+        - is_latest_version == false
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: By Family
+    groupBy:
+      property: family
+    order:
+      - property: document_version
+        direction: asc

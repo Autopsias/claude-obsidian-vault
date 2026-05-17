@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vault-eval",
+  "version": "0.1.0",
+  "description": "Retrieval-eval harness for the disciplined Obsidian vault — 33-question template (S+X+T+MH+CAL dimensions), sub-second smoke test, cross-encoder rerank (BAAI/bge-reranker-v2-m3), faithfulness eval. Falsifiable monthly cadence that turns vault behaviour into a number you can defend.",
+  "author": {
+    "name": "Ricardo Carvalho",
+    "email": "ricacarvalho@gmail.com"
+  },
+  "homepage": "https://github.com/Autopsias/claude-obsidian-vault",
+  "repository": "https://github.com/Autopsias/claude-obsidian-vault",
+  "license": "MIT",
+  "keywords": ["eval", "retrieval", "autoresearch", "smoke-test", "obsidian"]
+}

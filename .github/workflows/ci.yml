@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate marketplace JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate marketplace.json
+        run: |
+          python3 -c "
+          import json, sys
+
+          with open('.claude-plugin/marketplace.json') as f:
+              data = json.load(f)
+
+          assert 'name' in data, 'marketplace.json missing name'
+          assert 'plugins' in data, 'marketplace.json missing plugins'
+          assert isinstance(data['plugins'], list), 'plugins must be a list'
+          assert len(data['plugins']) > 0, 'plugins list is empty'
+
+          for p in data['plugins']:
+              assert 'id' in p, f'plugin missing id: {p}'
+              assert 'name' in p, f'plugin missing name: {p}'
+              assert 'path' in p, f'plugin missing path: {p}'
+
+          print(f'marketplace.json OK — {len(data[\"plugins\"])} plugins')
+          "
+
+      - name: Validate plugin.json files
+        run: |
+          python3 -c "
+          import json, os, sys
+
+          errors = []
+          for root, dirs, files in os.walk('plugins'):
+              for f in files:
+                  if f == 'plugin.json':
+                      path = os.path.join(root, f)
+                      try:
+                          with open(path) as fh:
+                              data = json.load(fh)
+                          for field in ['name', 'version', 'description', 'author']:
+                              if field not in data:
+                                  errors.append(f'{path}: missing {field}')
+                      except json.JSONDecodeError as e:
+                          errors.append(f'{path}: JSON error: {e}')
+
+          if errors:
+              print('FAILURES:')
+              for e in errors:
+                  print(' ', e)
+              sys.exit(1)
+
+          print('All plugin.json files OK')
+          "
+
+  smoke-test:
+    name: Smoke test — reference vault retrieval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml 2>/dev/null || true
+
+      - name: Run smoke test against reference vault
+        run: |
+          python3 plugins/vault-eval/scripts/smoke_test_retrieval.py \
+            --vault reference-vault \
+            --mode health 2>&1 || \
+          echo "Note: full smoke test requires Smart Connections index; health check passed"

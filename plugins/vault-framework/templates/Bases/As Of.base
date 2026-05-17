@@ -1,0 +1,46 @@
+# BT-05 — As Of point-in-time view (added 2026-05-11, Session S03, Bitemporal & Retrieval Hardening).
+#
+# PURPOSE: Answer "what documents were current on date X?" — a bitemporal
+# point-in-time query. Shows every document whose document_date is on or
+# before AS_OF_DATE AND that had not yet been superseded by AS_OF_DATE
+# (i.e. superseded_date is absent, empty, or strictly after AS_OF_DATE).
+#
+# MANUAL-EDIT PATTERN (Bases don't support runtime parameters natively):
+#   1. Find all three occurrences of the date string below (marked ← AS_OF_DATE).
+#   2. Replace ALL THREE with your target date in ISO format (YYYY-MM-DD).
+#      The three values MUST match or the result will be logically incorrect.
+#   3. Open this Base in Obsidian; the filtered rows are the answer.
+#   4. Reset to "2099-12-31" to see all current documents regardless of date
+#      (a far-future date acts as "now"; superseded_date will never exceed it
+#      for non-superseded documents, so they all pass the second conjunct).
+#
+# CURRENT AS_OF_DATE: 2026-04-01  ← change this comment as a reminder
+#
+# TWO-CLOCK LOGIC (per P-4 "_operating_guide.md"):
+#   document_date  = valid-time of authoring (when the content was written).
+#   superseded_date = transaction-time of supersession (when the system recorded
+#                    that this doc was replaced). NOT the successor's effective_date.
+#   A document is "current on date X" iff:
+#     document_date <= X  AND  (superseded_date > X  OR  superseded_date is empty)
+#
+# SCOPE: Cross-type — spans source, meeting, and decision. Classified as
+# view-only by the bases verifier.
+filters:
+  and:
+    - document_date <= "2026-04-01"
+    - or:
+        - superseded_date > "2026-04-01"
+        - superseded_date == ""
+views:
+  - type: table
+    name: As Of
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: As Of — By Type
+    groupBy:
+      property: type
+    order:
+      - property: document_date
+        direction: desc

@@ -1,0 +1,18 @@
+filters:
+  and:
+    - type == "source"
+views:
+  - type: table
+    name: All Sources
+    order:
+      - property: file.mtime
+        direction: desc
+  - type: table
+    name: Unprocessed
+    filters:
+      and:
+        - status == "unprocessed"
+  - type: table
+    name: By Type
+    groupBy:
+      property: source_type

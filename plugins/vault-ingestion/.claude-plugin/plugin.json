@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vault-ingestion",
+  "version": "0.1.0",
+  "description": "Multi-format ingestion pipeline for the disciplined Obsidian vault — PDF / DOCX / PPTX / XLSX / HTML / MD / TXT / image → typed .md note with purpose.md classifier, frontmatter contract, original preserved at 99 Workspace/_originals/, three-tier dedup (binary SHA / text-hash / semantic warn).",
+  "author": {
+    "name": "Ricardo Carvalho",
+    "email": "ricacarvalho@gmail.com"
+  },
+  "homepage": "https://github.com/Autopsias/claude-obsidian-vault",
+  "repository": "https://github.com/Autopsias/claude-obsidian-vault",
+  "license": "MIT",
+  "keywords": ["ingestion", "pipeline", "dedup", "frontmatter", "obsidian"]
+}

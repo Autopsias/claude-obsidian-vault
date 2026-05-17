@@ -1,0 +1,19 @@
+name: Open Items
+type: base
+description: Cross-workstream view — open action items and unresolved questions. Populated from meeting notes and state MOC. Use this for at-a-glance integration state.
+filters:
+  - field: type
+    operator: in
+    values: [meeting, project, source]
+view: table
+columns:
+  - name
+  - workstream
+  - last_updated
+sort:
+  - field: last_updated
+    order: asc
+notes: |
+  This Base surfaces the oldest-touched items first (ascending last_updated) to highlight staleness.
+  For decision-relevant open items, read the ## Open Questions section in 30 Projects/Acme-BetaCo Integration.md.
+  For action item tracking, see 99 Workspace/_session_handoff.md.

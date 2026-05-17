@@ -1,0 +1,16 @@
+name: Meetings
+type: base
+description: All meeting notes, sorted by date descending
+filters:
+  - field: type
+    operator: equals
+    value: meeting
+view: table
+columns:
+  - name
+  - date
+  - workstream
+  - last_updated
+sort:
+  - field: date
+    order: desc

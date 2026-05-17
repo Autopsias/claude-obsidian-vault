@@ -1,0 +1,16 @@
+filters:
+  and:
+    - type == "company"
+views:
+  - type: table
+    name: All Companies
+    order:
+      - property: title
+        direction: asc
+  - type: table
+    name: By Industry
+    order:
+      - property: industry
+        direction: asc
+    groupBy:
+      property: industry

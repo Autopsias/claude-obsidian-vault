@@ -1,0 +1,19 @@
+filters:
+  and:
+    - type == "person"
+views:
+  - type: table
+    name: All People
+    order:
+      - property: title
+        direction: asc
+  - type: table
+    name: Active People
+    filters:
+      and:
+        - status == "active"
+    order:
+      - property: organization
+        direction: asc
+  - type: cards
+    name: People Cards

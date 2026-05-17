@@ -1,0 +1,44 @@
+# Galp Vault — Ingestion Pipeline (RUNTIME dependencies)
+#
+# These are the libraries the live pipeline imports at runtime. Anything
+# only needed for tests or fixtures lives in requirements-dev.txt;
+# anything that needs a system package (Homebrew, apt) is documented in
+# requirements-system.md.
+#
+# Pinned to MAJOR.MINOR; patch float OK. Tighter pins only if a CVE or
+# breakage forces it. Re-evaluate at the T+180 substrate review.
+#
+# Authored: 2026-05-13 (S01 F-04 of v2 ingestion plan, Merged M3).
+
+# ── Text extraction ────────────────────────────────────────────────
+pdfplumber~=0.11.0          # primary PDF extractor (text + tables)
+pdfminer.six>=20240706      # pdfplumber dependency; also fallback raw-text extraction
+mammoth~=1.8.0              # DOCX → markdown (preserves footnotes, comments, tracked changes)
+python-pptx~=1.0.2          # PPTX layout + speaker notes
+openpyxl~=3.1.5             # XLSX cells, formulas, named ranges
+pandas~=2.2.2               # tabular data normalisation for XLSX summary tables
+
+# ── Image / OCR ────────────────────────────────────────────────────
+Pillow>=10.4.0              # generic image I/O (pillow-heif>=0.19 pulls >=11.1; allow float)
+pillow-heif>=0.19.0         # HEIC/HEIF support (iPhone screenshots); 0.18.x incompatible with libheif>=1.20 (macOS 26)
+pytesseract~=0.3.10         # Tesseract local OCR (default for image-ocr handler)
+
+# ── Frontmatter handling ───────────────────────────────────────────
+python-frontmatter~=1.1.0   # parse / write YAML frontmatter without reordering keys
+
+# ── Naming / slugs ─────────────────────────────────────────────────
+python-slugify~=8.0.4       # deterministic slug generation for ingested .md filenames
+
+# ── Optional: cloud OCR opt-in path (Merged D1) ────────────────────
+# Only imported when the run is invoked with --allow-cloud-ocr AND the
+# file is NOT named *.confidential.*. See 70 Decisions/<TBD> for the
+# go-live decision record.
+anthropic~=0.39.0
+
+# ── Auto-linking substrate (Frontier Adoption S07, 2026-05-17) ──────
+# AL-01 / AL-03 / AL-05. spaCy NER + deterministic Aho-Corasick exact match.
+# Adds ~1.1 GB to disk once PT+EN large models are downloaded — see
+# 90 System/_setup_venv.sh for the model-download step (separate from
+# pip install). pyahocorasick is a small C extension (~400 KB installed).
+spacy>=3.7                  # NER (PT + EN). Lang detection via spacy_langdetect or langdetect (added later if needed).
+pyahocorasick>=2.1          # Aho-Corasick automaton for exact-string entity matching (90 System/_link_matcher.py)

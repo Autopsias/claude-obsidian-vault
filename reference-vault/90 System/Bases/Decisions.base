@@ -1,0 +1,18 @@
+name: Decisions
+type: base
+description: All decision records
+filters:
+  - field: type
+    operator: equals
+    value: decision
+view: table
+columns:
+  - name
+  - status
+  - date
+  - decision_maker
+  - workstream
+  - last_updated
+sort:
+  - field: date
+    order: desc

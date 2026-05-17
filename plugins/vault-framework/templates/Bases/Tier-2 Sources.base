@@ -1,0 +1,24 @@
+filters:
+  and:
+    - type == "source"
+    - tier == "tier-2"
+views:
+  - type: table
+    name: All Tier-2 Sources
+    order:
+      - property: file.mtime
+        direction: desc
+  - type: table
+    name: By Workstream
+    groupBy:
+      property: workstream
+    order:
+      - property: file.mtime
+        direction: desc
+  - type: table
+    name: By Source Type
+    groupBy:
+      property: source_type
+    order:
+      - property: file.mtime
+        direction: desc

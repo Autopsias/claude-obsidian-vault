@@ -1,0 +1,21 @@
+filters:
+  and:
+    - type == "project"
+views:
+  - type: table
+    name: All Projects
+    order:
+      - property: title
+        direction: asc
+  - type: table
+    name: Active Projects
+    filters:
+      and:
+        - status == "active"
+    order:
+      - property: owner
+        direction: asc
+  - type: table
+    name: By Owner
+    groupBy:
+      property: owner

@@ -1,0 +1,46 @@
+# BT-04 — Latest Only view (added 2026-05-11, Session S03, Bitemporal & Retrieval Hardening).
+#
+# PURPOSE: Show only the current/live version of every document. Default-permissive:
+# files that do not carry is_latest_version at all are treated as current (they
+# predate the backfill and have not been superseded). Only files explicitly marked
+# is_latest_version: false (i.e. archived or superseded versions) are excluded.
+#
+# SCOPE: Cross-type — spans type:source and type:meeting (and any other type
+# that carries is_latest_version after a future backfill). Classified as
+# view-only by the bases verifier; does not contribute to per-type schema
+# enforcement.
+#
+# USE IN CASCADE: Retrieval step 2 — query this Base first when you want the
+# current state of a document family without seeing archived versions.
+filters:
+  and:
+    - is_latest_version != false
+views:
+  - type: table
+    name: Latest Only
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: Latest — By Type
+    groupBy:
+      property: type
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: Latest — Sources Only
+    filters:
+      and:
+        - type == "source"
+    order:
+      - property: document_date
+        direction: desc
+  - type: table
+    name: Latest — Meetings Only
+    filters:
+      and:
+        - type == "meeting"
+    order:
+      - property: document_date
+        direction: desc

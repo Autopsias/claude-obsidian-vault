@@ -1,0 +1,45 @@
+filters:
+  and:
+    - or:
+        - type == "person"
+        - type == "company"
+        - type == "project"
+        - type == "decision"
+    - or:
+        - status == "active"
+        - status == "pending"
+        - status == "open"
+        - status == "in_review"
+        - status == "proposed"
+views:
+  - type: table
+    name: All Open
+    order:
+      - property: file.mtime
+        direction: desc
+  - type: table
+    name: By Type
+    groupBy:
+      property: type
+    order:
+      - property: file.mtime
+        direction: desc
+  - type: table
+    name: Stale (oldest touched first)
+    order:
+      - property: file.mtime
+        direction: asc
+    limit: 25
+  - type: table
+    name: Stale Flagged (pending + confirmed)
+    filters:
+      or:
+        - stale == "pending"
+        - stale == "confirmed"
+    order:
+      - property: stale
+        direction: asc
+      - property: file.mtime
+        direction: asc
+  - type: cards
+    name: Open Cards

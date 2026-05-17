@@ -1,0 +1,32 @@
+filters:
+  and:
+    - or:
+        - type == "source"
+        - type == "decision"
+        - type == "meeting"
+        - type == "concept"
+    - confidence < 0.5
+    - is_latest_version == true
+views:
+  - type: table
+    name: Low Confidence (current versions)
+    order:
+      - property: confidence
+        direction: asc
+      - property: document_date
+        direction: desc
+  - type: table
+    name: By Type
+    groupBy:
+      property: type
+    order:
+      - property: confidence
+        direction: asc
+  - type: table
+    name: Speculation only (≤ 0.2)
+    filters:
+      and:
+        - confidence <= 0.2
+    order:
+      - property: document_date
+        direction: desc

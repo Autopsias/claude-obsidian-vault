@@ -1,0 +1,82 @@
+# Galp Vault — values for populate-claude-md.py
+# Run: python3 populate-claude-md.py --values values-galp.yaml
+#
+# Variables use {{VAR_NAME}} notation in the template.
+# Block scalars (|-) strip the trailing newline — the template provides spacing.
+
+# ── Core identity ────────────────────────────────────────────────────────────
+PROJECT_NAME: "Galp"
+USER_NAME: "Ricardo Carvalho"
+USER_FIRST_NAME: "Ricardo"
+USER_ROLE: "CTO of Galp Energia"
+ROLE_EFFECTIVE_DATE: "2026-05-04"
+REPORTING_LINE: "Co-CEOs MJ + JDMS"
+BACKGROUND_SUMMARY: "12 years Shell (Global Head of Digital), CDO at Secil, MBA IE Business School"
+COMMUNICATION_STYLE: "Direct, technically deep, business-value focused. Portuguese and English fluent"
+OPERATING_PHILOSOPHY: "open/event-driven/hub-spoke, no monoliths, business value over technical elegance, people drive transformation, IT integrated into business lines"
+
+# ── Vault paths ──────────────────────────────────────────────────────────────
+VAULT_PATH: "/Users/ricardocarvalho/Downloads/Galp-Vault"
+VAULT_FOLDER_NAME: "Galp-Vault"
+VAULT_SLUG: "galp-vault"
+VAULT_KEYWORD_LIST: "Galp/GALP/Peninsula"
+LEGACY_VAULT_PATH: "<YOUR_VAULT_PATH>/"
+LEGACY_VAULT_FOLDER: "Galp/"
+LEGACY_FREEZE_DATE: "2026-06-08"
+
+# ── Project ──────────────────────────────────────────────────────────────────
+KEY_PROJECT_PAGE: "30 Projects/Peninsula.md"
+PROJECT_CODENAME: "Project Peninsula"
+PURPOSE_STATEMENT: "Technology separation of Galp's downstream businesses (refining, retail) into JVs with Moeve (ex-Cepsa, backed by Mubadala/Carlyle). Galp retains upstream, renewables, trading, corporate"
+
+# ── Retrieval ────────────────────────────────────────────────────────────────
+M9_LANGUAGE: "PT/ES"
+
+# ── Vault metadata ───────────────────────────────────────────────────────────
+BASES_COUNT: "8"
+LAST_UPDATED: "2026-05-14"
+
+# ── People ───────────────────────────────────────────────────────────────────
+KEY_PEOPLE: "**Co-CEOs** Maria João Carioca (MJ) + João Diogo Marques da Silva (JDMS); **Moeve counterparts** CDIO (no name in external docs) + Susana Zumel Vara (Business Partnering)"
+
+# ── External resources ───────────────────────────────────────────────────────
+EXTERNAL_RESOURCES_LINE: "Raw transcripts: `/Users/ricardocarvalho/DeveloperFolder/Transcriber/transcriptions`. Calendar: Outlook web via Chrome MCP."
+
+# ── Project-specific block sections (|- strips trailing newline) ─────────────
+
+DECOMMISSION_SECTION: |-
+  ## Decommission Timeline (M5)
+
+  - **`freeze canonical` — T+30: 2026-06-08.** Freeze `/Downloads/Galp/`; retire/persist `galp-*` tasks; close rollback path.
+  - **`rollback move` — T+0→T+30 window.** Available if operating-use surfaces a problem the M2 eval missed (M2 PASSED 100%/100%).
+  - **`substrate review` — T+180: 2026-11-05.** 2-of-3 falsifiable check. Trigger actions and durable record formats: P-9 in `90 System/_operating_guide.md`.
+
+VOICE_RULE_SECTION: |-
+  ## Voice Rule
+
+  Any audience-facing prose drafted under Ricardo's name (emails, memos, board material, Slack, presentations, stakeholder updates) follows TWO compounding layers — both fire on every draft:
+
+  **Layer A — Voice (Ricardo-specific):** `90 System/_voice_profile.md` (v1.3) + curated samples in `90 System/_voice_corpus/`. Target is the durable Ricardo voice (stable 2017–2025); the AI-polished register is the explicit anti-pattern. **Never "Warm regards,"** — sign-off repertoire is Best Regards / Thanks / Cheers / Cumprimentos / Atentamente / Obg.
+
+  **Layer B — Craft (universal, cross-language):** `90 System/_writing_craft.md` (Pyramid Principle, BLUF, SCQA, storytelling frameworks, clarity rules, reader-respect, discourse construction). Works for EN / PT / ES with minor adjustments. Drawn from Minto / Garner / Strunk & White / Amazon 6-pager / plain-language movement.
+
+  Both layers auto-loaded via `.claude/rules/voice-discipline.md` on document-generation paths and trigger phrases. Unified `/voice` skill (`99 Workspace/_skill_packages/voice.skill`, 43KB) carries embedded snapshots of both layers + 7 curated samples — portable, works in any Cowork session. Three auto-detected modes: DRAFT (rough notes → draft), REWRITE (existing draft → rewritten + diff), CHECK (scan a draft, report violations). Combined pre-ship checklist: 25 items (15 voice + 10 craft).
+
+TITLE_RULE_SECTION: |-
+  ## Title Rule
+
+  **"CTO" / "Chief Technology Officer"** are correct (effective 2026-05-04). **NEVER "CTTO"** or any variant. Documents before 2026-05-04 are not retro-edited.
+
+ANONYMISATION_SECTION: |-
+  ## Document Anonymisation
+
+  External-facing docs: role titles not names (Ricardo → "Galp Technology"; Moeve CDIO → "Moeve's CDIO"). "G&P" not "GPL". Internal docs: real names OK. Full policy: `90 System/_comms_policy.md`.
+
+ADDITIONAL_POINTERS: |-
+  - Voice profile (v1.3) + curated corpus: `90 System/_voice_profile.md` · `90 System/_voice_corpus/` · auto-loading rule at `.claude/rules/voice-discipline.md`.
+  - Writing craft (cross-language, universal): `90 System/_writing_craft.md` (Pyramid / BLUF / SCQA / storytelling frameworks / clarity / discourse). Compounds with voice profile.
+  - **Unified `/voice` skill** (DRAFT / REWRITE / CHECK modes, embedded snapshots of BOTH voice + craft layers, portable — works in any Cowork session not just Galp) staged at `99 Workspace/_skill_packages/voice.skill` (43KB). Refresh ritual when profile/craft evolves: see `99 Workspace/_skill_packages/voice/references/README.md`. Superseded `voice-draft.skill` + `voicify.skill` archived. Full working corpus + miss/hit logs: `99 Workspace/_voice_corpus/`.
+  - P-10 quality filter: `90 System/_promotion_quality_guide.md`
+  - Active plans index: `_plans_index.md` (vault root) — lists all plans with title, path, session/item counts, date. Latest plan: highest date in the index. Plans themselves: `99 Workspace/_plan_*.html`.
+  - Layered rules (auto-loaded; inbox / state-moc / plugin-security path-gated): `.claude/rules/`
+  - Ingestion pipeline: `90 System/_ingestion_contract.md` · `90 System/_ingestion_pipeline/` · scheduled task `galp-vault-inbox-ingest` (live — go-live executed 2026-05-15)

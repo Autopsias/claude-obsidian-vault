@@ -1,0 +1,25 @@
+# Galp Vault — Ingestion Pipeline Configuration
+#
+# This file is the runtime config for the v2 ingestion pipeline.
+# Loaded by handlers/image.py for cloud OCR model selection.
+# Policy: 70 Decisions/2026-05-13_image_ocr_egress_policy.md
+#
+# IMPORTANT: cloud_ocr is disabled by default.
+# Cloud OCR only activates when ALL THREE conditions hold:
+#   1. Pipeline invoked with --allow-cloud-ocr
+#   2. Filename does NOT match *.confidential.*
+#   3. cloud_ocr.model is set below (non-empty)
+#
+# Authored: 2026-05-13 (S03, HR-03 of v2 ingestion plan)
+
+cloud_ocr:
+  # Model to use for cloud Vision OCR (Anthropic API).
+  # Set to the desired model string, e.g. "claude-opus-4-6" or "claude-haiku-4-5-20251001".
+  # Leave empty ("") to disable cloud OCR even when --allow-cloud-ocr is passed.
+  # Changing this value is a structural config change — update 70 Decisions policy record.
+  model: "claude-haiku-4-5-20251001"
+
+  # Maximum cloud API calls per pipeline run.
+  # Enforced in handle_image() when max_api_calls is passed by the orchestrator.
+  # 0 = disabled (no cap). Overridden by --max-api-calls N at runtime.
+  max_api_calls: 0
