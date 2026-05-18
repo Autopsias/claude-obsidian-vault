@@ -35,7 +35,7 @@ Five steps in order — stop at first clear hit: **Step 0 Lexical** (grep/ripgre
 
 Seven steps — full sequence: P-5 in `90 System/_operating_guide.md`. Enforced via `.claude/rules/session-bootstrap-discipline.md` (always-on session-start checklist — added 2026-05-13 retrospective). Load-bearing reminders:
 - Step 1: mount check — `{{VAULT_FOLDER_NAME}}/` only at mount root (+ `{{LEGACY_VAULT_FOLDER}}` during rollback window).
-- Step 2: read `_session_handoff.md` + run 3 sanity checks (date / file-list / maintenance-flag).
+- Step 2: read `_hot.md` FIRST (≤2 KB, ~5 s), then `_session_handoff.md` + run 3 sanity checks (date / file-list / maintenance-flag).
 - Step 4.5 (added 2026-05-25): read `_plans_index.md` and load the canonical active plan's Operating Manual + Up Next card. See P-5.
 - ⚠ **If eval >30 days old:** banner as first line of orientation — before any other content.
 

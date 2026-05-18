@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] — 2026-05-22
+
+### Added
+- `plugins/vault-framework/scripts/audit_chain.py` — Ed25519-signed hash-chained audit log generator with `--grep-prefix` flag (KA-03) emitting `## [YYYY-MM-DD] verb | basename` headers for greppable history
+- `plugins/vault-framework/hooks/post-write.sh` + `hooks/README.md` — Claude Code CLI post-write hook that pairs each file write with a git commit mirroring the latest chain entry (FN-06)
+- `plugins/vault-framework/rules/git-commit-discipline.md` — zone-prefixed commit message convention `[<zone>] <verb> <path> — <reason>`
+
+### Changed
+- `plugins/vault-framework/rules/session-bootstrap-discipline.md` — Step 2 now reads `_hot.md` FIRST before `_session_handoff.md` (KA-01)
+- `plugins/vault-framework/rules/auto-write-discipline.md` — three new sections: Karpathy grep-prefix header (KA-03), Ed25519-signed hash chain (EA-03), hash chain + git coexistence (FN-06)
+- `plugins/vault-framework/templates/CLAUDE-template.md` — Session Bootstrap section now mentions `_hot.md`
+
+---
+
 ## [0.1.0] — 2026-05-17
 
 ### Added
@@ -70,4 +84,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 16 People, 6 Companies, 1 state MOC, 10 Meetings, 5 Sources, 3 Decisions, 5 Concepts
 - Operating guide, 7 Bases, `_hot.md`, session handoff, autoresearch baseline
 
+[0.1.1]: https://github.com/Autopsias/claude-obsidian-vault/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Autopsias/claude-obsidian-vault/releases/tag/v0.1.0

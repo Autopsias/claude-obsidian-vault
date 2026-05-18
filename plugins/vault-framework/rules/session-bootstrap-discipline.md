@@ -15,8 +15,12 @@ Claude MUST have, in order:
 
 1. **Mount check.** `{{VAULT_FOLDER_NAME}}/` only at mount root. Per
    `mount-discipline.md`.
-2. **Read `99 Workspace/_session_handoff.md`** — last session, open
-   threads, next actions. Run the 3 sanity checks (date / file-list /
+2. **Read `99 Workspace/_hot.md` FIRST** — always-fresh, ≤2 KB
+   orientation surface: canonical plan + progress counter, Up Next session
+   items, one in-flight risk, one open question. Takes ~5 seconds; gives
+   the whole session context before anything else loads. Then read
+   **`99 Workspace/_session_handoff.md`** — forensic detail, open threads,
+   next actions. Run the 3 sanity checks on the handoff (date / file-list /
    maintenance-flag). Flag mismatches to {{USER_FIRST_NAME}} immediately;
    do not begin substantive work until the mismatch is explained.
 3. **Read `90 System/_operating_guide.md`** when the task is
@@ -97,6 +101,7 @@ Document any deviation in the handoff.
 - `90 System/_operating_guide.md` — P-5 full definition with all 3
   sanity-check details and end-of-session handoff lifecycle
 - `CLAUDE.md` — Session Bootstrap stable-prefix pointer
+- `99 Workspace/_hot.md` — always-fresh ≤2 KB orientation surface; read before _session_handoff.md
 - `99 Workspace/_session_handoff.md` — live handoff (target ≤15 KB)
 - `99 Workspace/_session_handoff_archive/` — forensic archive
 - `_plans_index.md` — plans registry
