@@ -165,3 +165,65 @@ entries were added without corresponding git commits (or vice versa).
 - Bulk reconciliation commits count as one chain entry but may correspond to
   multiple git commits — this is expected and does not invalidate the
   cross-verify check.
+
+## Log rotation — `chain_anchor` frontmatter
+
+`99 Workspace/_auto_writes.md` is rotated when its size exceeds 80 KB (200 KB
+for `_cleanup_log.md`) by the log-rotation tool — `kb-curator rotate-logs
+--root <vault>` in FLAT projects, or a vault-local rotation script (e.g.
+`90 System/_log_rotation.py`) in OBSIDIAN projects. Both share the same
+semantics: **propose-only by default; the `--execute` flag is user-gated and
+must never be auto-fired by any recurring task.** On execute, the oldest chain
+entries move to
+`99 Workspace/_archive/logs/_auto_writes_<year>_Q<n>_through_<date>.md`; the
+last N entries (default 60) stay live for operational context.
+
+### `chain_anchor` field
+
+After rotation, the live log's first chain entry's `prev_hash` no longer points
+to `NULL_PREV_HASH` — it points to the last entry now in the archive. To
+preserve verifier integrity, the live log carries a `chain_anchor: <64-hex>`
+field in its leading YAML frontmatter:
+
+```yaml
+---
+name: Auto-write log
+type: log
+chain_anchor: 92a1e3ac7d3851c70a0147440284be1516a6019b179cd9b6b3ce682217702e04
+---
+```
+
+`audit_chain.py verify` reads this field (via `_read_chain_anchor`) and seeds
+the walk with the anchor when present. Non-rotated logs have no anchor → the
+verifier falls back to `NULL_PREV_HASH` exactly as before. **Backward-compatible.**
+
+The archive segment also carries `successor_chain_anchor: <hex>` in its
+frontmatter pointing at the same value — the cross-link is documented and
+human-verifiable: `sha256(<last archive entry, stripped>) == chain_anchor`.
+
+### Rotation-backup expiry (auto-remediated by the daily health task)
+
+`--execute` writes a pre-rotation backup at
+`99 Workspace/_auto_writes.md.pre-rotation-YYYY-MM-DD` (a 1-week rollback
+window). The daily vault-health task auto-deletes any
+`_auto_writes.md.pre-rotation-*` whose mtime is older than 7 days, logging each
+delete as `verb: delete`. The 7-day window matches the rotation tool's own
+auto-rollback guarantee (verify failure → restore backup at execute time;
+manual rollback within 1 week).
+
+### Rotation-event chain entry
+
+After a successful execute, the rotation tool appends a `verb: note` chain entry
+to the new live log documenting the rotation (archive path, anchor hex,
+kept-tail size). Rotations are therefore grep-discoverable in the chain:
+
+```
+grep '## .* | _auto_writes_' _auto_writes.md
+```
+
+### Cross-references
+
+- The log-rotation tool — `kb-curator rotate-logs` (FLAT) or a vault-local
+  rotation script (OBSIDIAN)
+- `scripts/audit_chain.py` `_read_chain_anchor()` — the verifier extension that
+  reads `chain_anchor` from the live log's frontmatter

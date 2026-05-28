@@ -66,10 +66,10 @@ Editing an original in place corrupts the SHA-256 integrity check (contract
 corruption, run the §[INTEGRITY_SECTION] verification — do NOT "fix" by
 overwriting.
 
-### 3. Manifest is the truth for dedup
+### 3. Manifest is the truth for dedup — three tiers
 
 `[PROJECT_MANIFEST]` is the **authoritative dedup record**. One line per
-ingested file with full SHA-256, supersession_stem (contract
+ingested file with full SHA-256, text_sha256, supersession_stem (contract
 §[SUPERSESSION_SECTION]), run_id, supersedes list, extracted_at timestamp.
 
 The [ORIG_PREFIX_LENGTH]-character SHA prefix on the `[PROJECT_ORIGINALS_DIR]`
@@ -77,11 +77,47 @@ filename is **cosmetic** — disambiguates two files with identical original
 names in the file picker. Do NOT use the prefix for dedup logic anywhere in
 the code; collision risk above ~1500 files is too high. Query the manifest.
 
+The dedup check runs in **three sequential tiers**. Each tier has a distinct
+outcome — do not conflate them:
+
+**Tier 1 — Binary identity (exact_duplicate).**
+`manifest.has_sha(new_sha256)` — hit means the file is byte-for-byte identical
+to a previously ingested binary. Action: quarantine to
+`[PROJECT_QUARANTINE_DIR]` with reason `exact_duplicate`. No further tiers run.
+
+**Tier 2 — Content identity (content_duplicate).**
+`manifest.has_text_sha(new_text_sha256)` — hit means the extracted text is
+identical after normalisation (whitespace-collapsed, line-ending-normalised,
+lowercased), even if the binary differs (e.g. a re-exported PDF with updated
+metadata, or different compression). Action: quarantine to
+`[PROJECT_QUARANTINE_DIR]` with reason `content_duplicate`. The original binary
+is still written to `[PROJECT_ORIGINALS_DIR]` (it is not identical at binary
+level) but the ingested .md is not written — the content is already captured.
+The log entry includes both the new sha256 and the matching existing md_path
+for traceability. No further tiers run.
+
+**Tier 3 — Semantic proximity (soft warning only).**
+`mcp__smart-connections__lookup` top-3 nearest by cosine similarity — a hit at
+≥ [SEMANTIC_DEDUP_THRESHOLD] means the document is *similar* but not identical.
+Action: **NEVER quarantine.** Ingest proceeds to commit. The semantic_neighbors
+are written to `pipeline.semantic_neighbors` and high-similarity matches
+(≥ [SEMANTIC_DEDUP_THRESHOLD]) surface as soft duplicate candidates in
+`[PROJECT_SUPERSESSION_QUEUE]`. See contract §[SEMANTIC_DEDUP_SECTION] for the
+locked posture — this tier must not be silently escalated to blocking.
+
+**Summary table:**
+
+| Tier | Match type | Manifest query | Action |
+|------|-----------|----------------|--------|
+| 1 | Binary SHA-256 match | `has_sha()` | Quarantine (exact_duplicate) |
+| 2 | Text SHA-256 match | `has_text_sha()` | Quarantine (content_duplicate) |
+| 3 | Semantic score ≥ [SEMANTIC_DEDUP_THRESHOLD] | Smart Connections lookup | Soft warning only; ingest proceeds |
+
 If `[PROJECT_MANIFEST]` is corrupted, the pipeline runs in
-`--rebuild-manifest` mode: walks `[PROJECT_ORIGINALS_DIR]`, recomputes
-SHA-256s, queries each `.md` in `[PROJECT_INBOX]` + typed zones for matching
-`pipeline.sha256:`, and reconstructs the manifest. Slow, idempotent,
-non-destructive. Never auto-runs.
+`--rebuild-manifest` mode: walks `[PROJECT_ORIGINALS_DIR]`, recomputes SHA-256s
+and text_sha256s, queries each `.md` in `[PROJECT_INBOX]` + typed zones for
+matching `pipeline.sha256:` and `pipeline.text_sha256:`, and reconstructs the
+manifest. Slow, idempotent, non-destructive. Never auto-runs.
 
 ### 4. Frontmatter namespacing — user fields always win
 
@@ -187,6 +223,8 @@ rule is the operational kernel that fills those gaps.
 | `[ORIG_NAMING_CONVENTION]` | `<sha[:8]>_<original_name>` | Originals filename scheme |
 | `[ORIG_PREFIX_LENGTH]` | 8 | SHA prefix length in originals filename |
 | `[SUPERSESSION_SECTION]` | §7 | Contract section number for supersession |
+| `[SEMANTIC_DEDUP_SECTION]` | §7.5 | Contract section for the locked semantic-dedup (soft-warning) posture |
+| `[SEMANTIC_DEDUP_THRESHOLD]` | 0.80 | Cosine-similarity threshold for Tier 3 soft duplicate candidates |
 | `[INTEGRITY_SECTION]` | §8.3 | Contract section number for SHA verification |
 | `[NS_SECTION]` | §5 | Contract section for frontmatter namespacing |
 | `[N]` (in P-[N]) | 14 | P-rule number for the ingestion pipeline |
