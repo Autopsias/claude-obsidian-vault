@@ -1,13 +1,14 @@
 <!-- KERNEL: Enforces P-5 (session lifecycle / bootstrap) from the operating
      guide as an always-on session-start reminder. Auto-loads every session.
-     The 7-step sequence is universal; specific path names and rollback
+     The numbered sequence is universal; specific path names and rollback
      windows in PROJECT-SPECIFIC sections adapt per project. -->
 
 # Session bootstrap discipline
 
-P-5 (`90 System/_operating_guide.md`) defines the 7-step session
-bootstrap. The lifecycle is enforced — skipping steps silently corrupts
-state.
+P-5 (`90 System/_operating_guide.md`) defines the session bootstrap.
+The lifecycle is enforced — skipping steps silently corrupts state. The
+bootstrap has numbered steps plus the half-steps 4.5 (plans index) and
+4.6 (content catalog — read `_index.md`).
 
 ## At session start — before substantive work
 
@@ -34,15 +35,56 @@ Claude MUST have, in order:
    card. Skip silently if the index is empty or all plans are
    archived / completed. *(This is step 4.5 in `_operating_guide.md`;
    numbered 5 here for sequential clarity.)*
-6. **Glance at `90 System/Bases/Open Items.base`** for at-a-glance
+6. **Read the first 100 lines of `_index.md`** at vault root — the
+   vault content catalog. This is the Karpathy-pattern global
+   orientation surface: one line per non-ephemeral note, grouped by
+   zone, sorted within zone by last-touched desc. The first 100 lines
+   surface the most recently touched entities across People, Companies,
+   Projects, and the head of Meetings — enough to know "what is the
+   vault currently about?" before any specific retrieval.
+
+   *Freshness gate.* If `_index.md` is missing OR its frontmatter
+   `last_updated:` is more than 1 day old, regenerate before reading:
+   ```
+   python3 "90 System/_build_index.py" --root {{VAULT_PATH}}
+   ```
+   The generator is idempotent and runs in <2 s. *(This is step 4.6 in
+   `_operating_guide.md`; numbered 6 here for sequential clarity.)*
+7. **Glance at `90 System/Bases/Open Items.base`** for at-a-glance
    state across People / Companies / Projects / Decisions. The "Stale
    (oldest touched first)" view surfaces freshness concerns proactively.
-7. **Check Smart Connections health** — `mcp__smart-connections__stats`.
+8. **Check Smart Connections health** — `mcp__smart-connections__stats`.
    If the index is >7 days stale or source-count drift exceeds 2%, flag
    and pause writes.
-8. **Check prior handoff for next-session triggers** — consolidation
+9. **Check prior handoff for next-session triggers** — consolidation
    backlog, eval re-run due, log rotation pending, compression flagged.
-   Surface to {{USER_FIRST_NAME}} before starting new work.
+   Additionally surface these follow-up items before starting new work:
+   - **(a) Promotion candidates** — if the handoff has a
+     `## 🗂 Promotion candidates` section, read it and flag any pending
+     rows to {{USER_FIRST_NAME}}. If rows are present, offer to run the
+     `promote` skill (`.claude/skills/promote/`) on each one before
+     beginning the session's primary work.
+   - **(b) Revisit queue** — if `99 Workspace/_revisit_queue.md` exists
+     and is less than 7 days old, surface the three sampled notes as:
+     "Revisit queue: [[A]], [[B]], [[C]] — still accurate? merge/split/
+     archive?" Offer to verify each inline or defer to the end of the
+     session.
+   - **(c) Recommendation queue** — read
+     `99 Workspace/_recommendations_open.jsonl`. Surface the following
+     **before any substantive work**, in this order:
+     1. **EXPIRED rows** (any row where `expires_at < today` and
+        `status == "OPEN"` — aging task may not have run yet): surface
+        as a banner: "⚠ [N] expired recommendations — review
+        _recommendations_open.jsonl before new work."
+     2. **T3 OPEN rows** (`tier == 3`): surface alongside the eval
+        banner (both are vault-behaviour integrity flags). Banner:
+        "⚠ EVAL OVERDUE — T3 recommendation open: [description]."
+     3. **High OPEN count** (> 10 OPEN rows): lightweight flag —
+        "[N] recommendations in queue; consider reviewing before new
+        work."
+     If the file is empty or does not exist: skip silently.
+     Banner order at orientation: eval → T3 OPEN → EXPIRED → high-count
+     flag → then orientation summary.
 
 After bootstrap, give {{USER_FIRST_NAME}} a **30-second orientation**:
 last session date, what was worked on, open threads, what was wanted
@@ -104,8 +146,14 @@ Document any deviation in the handoff.
 - `99 Workspace/_hot.md` — always-fresh ≤2 KB orientation surface; read before _session_handoff.md
 - `99 Workspace/_session_handoff.md` — live handoff (target ≤15 KB)
 - `99 Workspace/_session_handoff_archive/` — forensic archive
-- `_plans_index.md` — plans registry
+- `_plans_index.md` — plans registry (step 5)
+- `_index.md` — vault content catalog, Karpathy-pattern (step 6)
+- `90 System/_build_index.py` — regenerator for `_index.md` (idempotent;
+  also exposes `--append PATH` as a promotion hook)
 - `80 Daily/` — daily notes (per `daily-notes-discipline.md`)
 - `90 System/Bases/Open Items.base` — at-a-glance state Base
 - `.claude/rules/freshness-discipline.md` — handoff ≤15 KB threshold,
   3-strike compression rule
+- `99 Workspace/_recommendations_open.jsonl` — live recommendation queue (step 9c)
+- `99 Workspace/_recommendations_log.md` — terminal-state archive
+- `90 System/_closed_loop_contract.md` — recommendation schema, tier map, expiry windows
