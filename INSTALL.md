@@ -24,7 +24,7 @@ In Claude for Desktop, open Cowork and select your project folder (the folder yo
 ### 2. Add the marketplace
 
 ```
-/plugin marketplace add https://github.com/<owner>/claude-obsidian-vault
+/plugin marketplace add https://github.com/Autopsias/claude-obsidian-vault
 ```
 
 ### 3. Install the framework plugin
@@ -47,6 +47,30 @@ Or install everything at once:
 ```
 /plugin install @claude-obsidian-vault
 ```
+
+> **Install at user scope so the skills reach every project.** `/plugin install`
+> defaults to **user scope** (`~/.claude/settings.json`), which makes the framework
+> and all its skills available in *every* project on your machine — and outside any
+> project too. To be explicit, append `--scope user`:
+>
+> ```
+> /plugin install @claude-obsidian-vault --scope user
+> ```
+>
+> Verify with `/plugin list` — each plugin should show **user** scope. Avoid
+> `--scope project` for this framework: that pins the skills to one folder's
+> `.claude/settings.json`, which is the opposite of what you want here.
+
+> **Generic-in-marketplace, specialised-in-project — the override pattern.** The
+> reusable skills live here in the marketplace (user scope → all projects). When a
+> single project needs a tailored variant — for example a vault-specific
+> `kb-curator` or `promote` with hardcoded paths and project rules — put the
+> customised `SKILL.md` in *that project's* `.claude/skills/<name>/`. Project skills
+> and plugin skills are namespaced separately, so the two coexist cleanly: the one
+> project runs its tailored version while every other project uses the generic one.
+> A skill living in a project's `.claude/skills/` is therefore not a misplaced
+> global — it's a deliberate local override. Keep only genuinely project-specific
+> skills there; everything reusable belongs in the marketplace.
 
 ### 4. Install Smart Connections in Obsidian
 
@@ -101,7 +125,7 @@ What `verify_baseline.py` checks:
 ### 1. Clone and bootstrap
 
 ```bash
-git clone https://github.com/<owner>/claude-obsidian-vault
+git clone https://github.com/Autopsias/claude-obsidian-vault
 cd claude-obsidian-vault
 ./scripts/bootstrap.sh
 ```
