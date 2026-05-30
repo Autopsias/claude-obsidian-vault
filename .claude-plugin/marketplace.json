@@ -8,13 +8,10 @@
   },
   "description": "A disciplined Obsidian-vault framework for knowledge work with Claude — operating-guide kernel, 5-step retrieval cascade, 8 Bases, eval harness, multi-format ingestion, and a portable voice profile. Born from a real working CTO vault; templatised for reuse.",
   "version": "0.1.0",
-  "metadata": {
-    "pluginRoot": "./plugins"
-  },
   "plugins": [
     {
       "name": "vault-framework",
-      "source": "vault-framework",
+      "source": "./plugins/vault-framework",
       "description": "The kernel — CLAUDE.md template, operating-guide kernel (9 universal P-rules), 8 .claude/rules disciplines, /vault-setup path-detecting scaffolder, /hot orientation surface, and /promote workspace→typed-zone ritual.",
       "version": "0.1.0",
       "author": { "name": "Ricardo Carvalho" },
@@ -24,7 +21,7 @@
     },
     {
       "name": "vault-skills",
-      "source": "vault-skills",
+      "source": "./plugins/vault-skills",
       "description": "The active-maintenance skill bundle — kb-curator (audit/lint/refresh-index), plan-builder (HTML session-tracker dashboards), save-conversation (chat → typed vault note with quality filter), autoresearch-loop (Karpathy-style scored optimisation of any text artefact).",
       "version": "0.1.0",
       "author": { "name": "Ricardo Carvalho" },
@@ -34,7 +31,7 @@
     },
     {
       "name": "vault-eval",
-      "source": "vault-eval",
+      "source": "./plugins/vault-eval",
       "description": "The retrieval-eval harness — 33-question template, sub-second smoke test, cross-encoder rerank, faithfulness eval. Falsifiable monthly cadence that turns vault behaviour into a number you can defend.",
       "version": "0.1.0",
       "author": { "name": "Ricardo Carvalho" },
@@ -44,7 +41,7 @@
     },
     {
       "name": "vault-ingestion",
-      "source": "vault-ingestion",
+      "source": "./plugins/vault-ingestion",
       "description": "The multi-format ingestion pipeline — PDF / DOCX / PPTX / XLSX / HTML / MD / TXT / image → typed .md note with purpose.md classifier, frontmatter contract, original preserved, three-tier dedup (binary SHA / text-hash / semantic warn).",
       "version": "0.1.0",
       "author": { "name": "Ricardo Carvalho" },
@@ -54,7 +51,7 @@
     },
     {
       "name": "vault-voice",
-      "source": "vault-voice",
+      "source": "./plugins/vault-voice",
       "description": "The personal-voice layer — voice-profile.md template, voice-discipline auto-load rule, populate-voice-profile.py extractor that turns a corpus of authored prose into a calibrated style guide. Any draft Claude writes under your name gets it right.",
       "version": "0.1.0",
       "author": { "name": "Ricardo Carvalho" },
