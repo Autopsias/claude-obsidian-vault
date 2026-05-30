@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """
-Build a self-contained HTML plan dashboard from a JSON spec.
+Build a self-contained HTML plan dashboard from a JSON spec (Aurora edition).
 
 Usage:
-    python build_plan.py <spec.json> <output.html>
+    python build_plan.py <spec.json> <output.html> [--register-in <project-root>]
 
 The script reads a plan spec JSON, validates it, then assembles the final HTML
 by injecting generated fragments into the base template's marker comments.
+
+The Aurora edition emits a DUAL-LAYER card structure:
+  * HUMAN layer (prominent): id, title, status pill, plain-English `human_summary`,
+    `deliverable` callout, "Why this matters" italic line.
+  * AGENT layer (collapsible <details class="agent-spec">): description, agent
+    instructions, schema, mockup, code excerpt, owner / target / touches.
+
+All new spec fields are OPTIONAL — old specs continue to build identically
+except for the visual refresh.
 
 See ../references/schemas.md for the spec schema.
 """
@@ -62,6 +71,12 @@ def validate_spec(spec):
         for iid in s["items"]:
             if iid not in item_ids:
                 raise ValueError(f"Session {s['id']} references unknown item {iid!r}")
+        thinking = s.get("thinking")
+        if thinking and normalize_thinking(thinking) not in THINKING_CANON:
+            raise ValueError(
+                f"Session {s['id']} has invalid thinking effort {thinking!r}; "
+                f"use one of Low / Medium / High / Extra / Max"
+            )
 
     info = spec["infographic"]
     valid_types = ["phase-journey", "maturity-ladder", "hub-spoke", "before-after", "pillars", "custom"]
@@ -83,29 +98,71 @@ def validate_spec(spec):
 # Helpers
 # --------------------------------------------------------------------------
 def esc(s):
-    """HTML-escape text content."""
     return html.escape(str(s), quote=False) if s is not None else ""
 
 def attr(s):
-    """HTML-escape attribute values (with quotes)."""
     return html.escape(str(s), quote=True) if s is not None else ""
 
 def encode_pre(s):
-    """Encode text for safe embedding inside a <pre> block. < > & all need escaping."""
+    """Encode text for safe embedding inside a <pre> block."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def today_iso():
     return date.today().isoformat()
 
 # --------------------------------------------------------------------------
-# Fragment generators
+# Model + thinking-effort helpers (Cowork model + Effort Control picker)
+# --------------------------------------------------------------------------
+# Each session card recommends a Cowork *model* (e.g. "Opus 4.8", "Sonnet 4.6")
+# and a *thinking-effort* level the user sets in Cowork's Effort Control picker.
+# Model strings are free-form labels; we derive a CSS *family* (opus / sonnet /
+# haiku) for chip color + arc dot so any version label renders correctly.
+MODEL_FAMILIES = ("opus", "sonnet", "haiku")
+
+def model_family(model):
+    """Map any model label to a CSS family for chip color + arc dot."""
+    m = (model or "").lower()
+    for f in MODEL_FAMILIES:
+        if f in m:
+            return f
+    return "sonnet"
+
+# Cowork Effort Control picker labels. Adaptive thinking decides WHETHER to
+# think; effort guides HOW MUCH. Synonyms (API / Claude Code tokens) normalize
+# to the Cowork picker label so authors can write either vocabulary.
+THINKING_CANON = ["Low", "Medium", "High", "Extra", "Max"]
+THINKING_SYNONYMS = {
+    "low": "Low",
+    "medium": "Medium", "med": "Medium",
+    "high": "High",
+    "extra": "Extra", "xhigh": "Extra", "x-high": "Extra",
+    "extra high": "Extra", "extrahigh": "Extra", "extra-high": "Extra",
+    "max": "Max", "maximum": "Max",
+}
+
+def normalize_thinking(value):
+    """Return the canonical Cowork picker label, or '' if unset.
+    Unknown values are returned trimmed (validate_spec catches typos)."""
+    if not value:
+        return ""
+    key = str(value).strip().lower()
+    if key in THINKING_SYNONYMS:
+        return THINKING_SYNONYMS[key]
+    for c in THINKING_CANON:
+        if c.lower() == key:
+            return c
+    return str(value).strip()
+
+# --------------------------------------------------------------------------
+# Strip + filter chip + category fragments
 # --------------------------------------------------------------------------
 def gen_session_strip(sessions):
-    """Generate the sticky session navigation strip (chips, one per session)."""
     chips = []
     for s in sessions:
         sid = s["id"]
-        title_text = f"{sid.upper()} — {s['title']} · {s.get('model','Sonnet')}"
+        model = s.get('model', 'Sonnet')
+        thinking = normalize_thinking(s.get('thinking', ''))
+        title_text = f"{sid.upper()} — {s['title']} · {model}" + (f" · {thinking} effort" if thinking else "")
         chips.append(
             f'  <a href="#{attr(sid)}" class="strip-chip" data-session="{attr(sid)}" '
             f'data-status="TODO" title="{attr(title_text)}">{esc(sid.upper())}</a>'
@@ -118,15 +175,13 @@ def gen_session_strip(sessions):
     )
 
 def gen_category_filter_chips(categories):
-    """Generate category filter chips inside the dashboard."""
     chips = ['<div class="cat-filter active" data-cat="all">All</div>',
-             '<div class="cat-filter" data-cat="sessions">Session Plan</div>']
+             '<div class="cat-filter" data-cat="sessions">Session plan</div>']
     for c in categories:
         chips.append(f'<div class="cat-filter" data-cat="{attr(c["key"])}">{esc(c["label"])}</div>')
     return '\n        '.join(chips)
 
 def gen_cats_array_js(categories):
-    """Generate the CATS array literal (without `const CATS =` prefix; template already has that)."""
     lines = ["[",
              "        { key: 'sessions', label: 'Session Plan', type: 'session' },"]
     for c in categories:
@@ -134,21 +189,92 @@ def gen_cats_array_js(categories):
     lines.append("      ]")
     return '\n'.join(lines)
 
-# Palette rotation for category accent colors. Skip 'sessions' which always uses purple.
-ACCENT_VARS = ['var(--accent)', 'var(--blocked)', 'var(--sonnet)', 'var(--doing)',
-               'var(--p1)', 'var(--p2)', 'var(--purple)', 'var(--opus)', 'var(--deferred)']
+# Palette rotation for category accent colors. Skip 'sessions' which always uses session/terra.
+ACCENT_VARS = ['var(--galp)', 'var(--terra)', 'var(--sonnet)', 'var(--doing)',
+               'var(--done)', 'var(--p1)', 'var(--p2)', 'var(--opus)', 'var(--deferred)']
 
 def gen_category_colors_css(categories):
-    """Generate CSS rules assigning each category an accent color."""
-    lines = ['  /* category accent palette */',
-             '  .cat-row[data-cat="sessions"] { --cat-accent: var(--purple); }']
+    lines = ['  .cat-row[data-cat="sessions"] { --cat-accent: var(--session); }']
     for i, c in enumerate(categories):
         accent = ACCENT_VARS[i % len(ACCENT_VARS)]
         lines.append(f'  .cat-row[data-cat="{c["key"]}"] {{ --cat-accent: {accent}; }}')
     return '\n'.join(lines)
 
+# --------------------------------------------------------------------------
+# Dual-layer agent-spec content blocks
+# --------------------------------------------------------------------------
+def gen_code_block(content_field, label):
+    """Render a code/schema/mockup code excerpt as a dark code-block.
+    `content_field` may be a string (raw code) or a dict with optional keys:
+      - code (str): the actual code
+      - lang (str): language hint shown in the header (e.g. 'json', 'sql', 'ts')
+      - caption (str): optional caption line
+    Returns empty string if no usable content.
+    """
+    if not content_field:
+        return ""
+    if isinstance(content_field, str):
+        code, lang, caption = content_field, "", ""
+    elif isinstance(content_field, dict):
+        code = content_field.get("code", "")
+        lang = content_field.get("lang", "")
+        caption = content_field.get("caption", "")
+    else:
+        return ""
+    if not code:
+        return ""
+    lang_label = lang.upper() if lang else label.upper()
+    caption_html = f'<figcaption style="color:var(--text-muted);font-size:11.5px;font-style:italic;margin-top:6px;">{esc(caption)}</figcaption>' if caption else ""
+    return f'''<div class="code-block">
+      <div class="code-block-head"><span class="agent-tag">{esc(label)}</span><span>{esc(lang_label)}</span></div>
+      <pre>{encode_pre(code)}</pre>
+    </div>{caption_html}'''
+
+def gen_mockup_block(mockup):
+    """Render a mockup as <figure class="mockup">.
+    `mockup` may be a string (raw SVG/HTML/ASCII) or a dict:
+      - svg (str): inline SVG markup
+      - ascii (str): ASCII / text mockup, rendered in <pre>
+      - img (str): image URL
+      - caption (str): optional caption
+    """
+    if not mockup:
+        return ""
+    if isinstance(mockup, str):
+        # Detect SVG by leading tag
+        m = mockup.lstrip()
+        if m.startswith("<svg") or m.startswith("<?xml"):
+            inner = mockup
+            return f'<figure class="mockup"><span class="agent-tag" style="float:left">MOCKUP</span>{inner}</figure>'
+        else:
+            return f'<figure class="mockup"><span class="agent-tag" style="float:left">MOCKUP · ASCII</span><pre>{encode_pre(mockup)}</pre></figure>'
+    if isinstance(mockup, dict):
+        caption = mockup.get("caption", "")
+        cap_html = f'<figcaption>{esc(caption)}</figcaption>' if caption else ""
+        if mockup.get("svg"):
+            return f'<figure class="mockup"><span class="agent-tag" style="float:left">MOCKUP</span>{mockup["svg"]}{cap_html}</figure>'
+        if mockup.get("img"):
+            alt = attr(mockup.get("alt", "mockup"))
+            return f'<figure class="mockup"><span class="agent-tag" style="float:left">MOCKUP</span><img src="{attr(mockup["img"])}" alt="{alt}"/>{cap_html}</figure>'
+        if mockup.get("ascii"):
+            return f'<figure class="mockup"><span class="agent-tag" style="float:left">MOCKUP · ASCII</span><pre>{encode_pre(mockup["ascii"])}</pre>{cap_html}</figure>'
+    return ""
+
+def gen_agent_instructions(instr):
+    """Render agent_instructions as an ordered list. Accepts list[str] or str."""
+    if not instr:
+        return ""
+    if isinstance(instr, str):
+        return f'<p>{esc(instr)}</p>'
+    if isinstance(instr, list):
+        lis = "\n        ".join(f'<li>{esc(x)}</li>' for x in instr)
+        return f'<ol>\n        {lis}\n      </ol>'
+    return ""
+
+# --------------------------------------------------------------------------
+# Item card — dual layer
+# --------------------------------------------------------------------------
 def gen_item_article(item, item_to_session):
-    """Generate one item card."""
     iid = item["id"]
     sid = item_to_session.get(iid)
     session_link = (
@@ -158,36 +284,88 @@ def gen_item_article(item, item_to_session):
     )
     pri = item.get("priority", "P3")
     eff = item.get("effort", "M")
+    title = item["title"]
+    human_summary = item.get("human_summary", "")
+    deliverable = item.get("deliverable", "")
     desc = item.get("description", "")
     why = item.get("why", "")
     owner = item.get("owner", "")
     target = item.get("target", "")
     touches = item.get("touches", "")
     updated = item.get("updated", today_iso())
+
+    # AGENT spec body — only render if at least one technical field is present
+    agent_pieces = []
+    if desc and not human_summary:
+        # If there's no human_summary but a description, surface description in human layer instead — see below.
+        pass
+    elif desc:
+        agent_pieces.append(f'<h4>Detail</h4><p>{esc(desc)}</p>')
+    instr = item.get("agent_instructions")
+    if instr:
+        agent_pieces.append('<h4>Agent instructions</h4>' + gen_agent_instructions(instr))
+    sch = gen_code_block(item.get("schema"), "SCHEMA")
+    if sch:
+        agent_pieces.append('<h4>Schema</h4>' + sch)
+    mk = gen_mockup_block(item.get("mockup"))
+    if mk:
+        agent_pieces.append('<h4>Mockup</h4>' + mk)
+    code = gen_code_block(item.get("code"), "CODE")
+    if code:
+        agent_pieces.append('<h4>Code excerpt</h4>' + code)
+    if touches:
+        agent_pieces.append(f'<h4>Files / areas touched</h4><p><code>{esc(touches)}</code></p>')
+    agent_spec = ""
+    if agent_pieces:
+        agent_spec = f'''
+    <details class="agent-spec" data-role="agent-spec">
+      <summary><span class="notes-label">Agent spec</span> <span class="agent-tag">FOR CLAUDE</span></summary>
+      <div class="agent-spec-body">
+      {"".join(agent_pieces)}
+      </div>
+    </details>'''
+
+    # HUMAN layer: prefer human_summary, fallback to description.
+    summary_block = ""
+    if human_summary:
+        summary_block = f'<p class="human-summary">{esc(human_summary)}</p>'
+    elif desc:
+        summary_block = f'<p class="human-summary">{esc(desc)}</p>'
+
+    deliverable_block = ""
+    if deliverable:
+        deliverable_block = f'<div class="deliverable"><strong>When done</strong>{esc(deliverable)}</div>'
+
+    why_block = f'<p class="why"><strong>Why:</strong> {esc(why)}</p>' if why else ''
+
+    meta_parts = [session_link]
+    if owner:  meta_parts.append(f'<span><strong>Owner:</strong> {esc(owner)}</span>')
+    if target: meta_parts.append(f'<span><strong>Target:</strong> {esc(target)}</span>')
+    # Touches is moved into agent-spec when there's an agent_spec; if not, leave it visible.
+    if touches and not agent_pieces:
+        meta_parts.append(f'<span><strong>Touches:</strong> <code>{esc(touches)}</code></span>')
+
     return f'''  <article class="item" id="{attr(iid)}" data-status="TODO" data-priority="{attr(pri)}" data-cat="{attr(item["category"])}" data-updated="{attr(updated)}">
     <header class="item-head">
       <span class="id-tag">{esc(iid.upper())}</span>
-      <h3 class="title">{esc(item["title"])}</h3>
+      <h3 class="title">{esc(title)}</h3>
       <span class="pill status-TODO">TODO</span>
       <span class="chip priority-{attr(pri)}">{esc(pri)}</span>
       <span class="chip">Effort: {esc(eff)}</span>
     </header>
-    <p class="desc">{esc(desc)}</p>
-    {f'<p class="why"><strong>Why:</strong> {esc(why)}</p>' if why else ''}
+    {summary_block}
+    {deliverable_block}
+    {why_block}
     <div class="meta-row">
-      {session_link}
-      {f'<span><strong>Owner:</strong> {esc(owner)}</span>' if owner else ''}
-      {f'<span><strong>Target:</strong> {esc(target)}</span>' if target else ''}
-      {f'<span><strong>Touches:</strong> <code>{esc(touches)}</code></span>' if touches else ''}
-    </div>
+      {"".join(meta_parts)}
+    </div>{agent_spec}
     <details class="notes">
-      <summary>Notes (0)</summary>
+      <summary><span class="notes-label">Notes (0)</span></summary>
       <div class="notes-content"><span class="empty">No notes yet.</span></div>
     </details>
   </article>'''
 
 def gen_category_section(category, items, item_to_session):
-    """Generate a category section with all its item cards."""
     cat_items = [it for it in items if it["category"] == category["key"]]
     if not cat_items:
         return ""
@@ -201,8 +379,10 @@ def gen_category_section(category, items, item_to_session):
 </section>
 '''
 
+# --------------------------------------------------------------------------
+# Session closeouts — same as before
+# --------------------------------------------------------------------------
 def closeout_text_for_prompt(items, next_session):
-    """Generate the structured CLOSEOUT block embedded in each session prompt."""
     item_list = ", ".join(i.upper() for i in items)
     next_line = (
         f"(5) Hand off to next session: {next_session.upper()}. Append a one-line orientation to the project's session-handoff file."
@@ -226,7 +406,6 @@ CLOSEOUT — that's it. The dashboard, donuts, arc, categories, and last-updated
 If anything is unclear before starting, ask. The Operating Manual at the top of the file is the source of truth — read it if in doubt."""
 
 def gen_visible_closeout(sid, items, next_session, next_title):
-    """Generate the visible per-session closeout block (mirrors what's in the prompt)."""
     item_links = " · ".join(f'<a href="#{i}">{i.upper()}</a>' for i in items)
     n = len(items)
     item_word = "item" if n == 1 else "items"
@@ -247,62 +426,159 @@ def gen_visible_closeout(sid, items, next_session, next_title):
     </div>
 '''
 
-def gen_session_article(session, sessions_list, idx):
-    """Generate one session card with its prompt and closeout."""
+# --------------------------------------------------------------------------
+# Session card — dual layer with prominent action bar
+# --------------------------------------------------------------------------
+def session_purpose_fallback(session_title, item_ids, items_by_id):
+    """Build a substantive plain-English purpose paragraph when no human_summary
+    is provided on the session.
+
+    Strategy: pull each item's `human_summary` (preferred) or `description`
+    (fallback). Concatenate into a paragraph that actually explains WHAT the
+    session does, not just lists titles. If items carry no narrative content,
+    fall back to a title-list — better than nothing.
+    """
+    items = [items_by_id[iid] for iid in item_ids if iid in items_by_id]
+    if not items:
+        return f"Pick up the work in {session_title}."
+
+    # Per-item rich text: prefer human_summary, then description, last resort title.
+    rich = []
+    has_narrative = False
+    for it in items:
+        if it.get("human_summary"):
+            rich.append(it["human_summary"].strip())
+            has_narrative = True
+        elif it.get("description"):
+            # Take first sentence to keep length sane.
+            d = it["description"].strip()
+            first = re.split(r"(?<=[.!?])\s+", d, maxsplit=1)[0]
+            rich.append(first if first.endswith((".", "!", "?")) else first + ".")
+            has_narrative = True
+        else:
+            rich.append(f'"{it["title"]}".')
+
+    if has_narrative:
+        # Join the per-item narrative into one paragraph. The serif rendering at
+        # 26px will give it the right editorial weight.
+        return " ".join(rich)
+
+    # Pure title-list fallback when no item carries narrative content.
+    titles = [it["title"] for it in items]
+    if len(titles) == 1:
+        return f'Bring "{titles[0]}" across the finish line.'
+    if len(titles) == 2:
+        return f'Cover "{titles[0]}" and "{titles[1]}".'
+    head = ", ".join(f'"{t}"' for t in titles[:2])
+    return f'Cover {len(titles)} items: {head}, and {len(titles)-2} more.'
+
+
+
+def gen_session_article(session, sessions_list, idx, items_by_id=None):
     sid = session["id"]
+    total = len(sessions_list)
     model = session.get("model", "Sonnet")
-    model_lower = model.lower()
+    fam = model_family(model)
+    thinking = normalize_thinking(session.get("thinking", ""))
     effort = session.get("effort", "")
     why_model = session.get("why_model", "")
     items = session.get("items", [])
+    human_summary = session.get("human_summary", "")
+    deliverable = session.get("deliverable", "")
+    agent_instr = session.get("agent_instructions")
+    items_by_id = items_by_id or {}
 
-    # Find next session
     next_session = None
     next_title = None
-    if idx + 1 < len(sessions_list):
+    if idx + 1 < total:
         nxt = sessions_list[idx + 1]
         next_session = nxt["id"]
         next_title = nxt["title"]
 
     item_links = " · ".join(f'<a href="#{i}">{i.upper()}</a>' for i in items)
-
-    # Prompt: user-supplied body + auto-appended closeout
     prompt_body = session.get("prompt", "").rstrip()
     full_prompt = prompt_body + closeout_text_for_prompt(items, next_session)
     prompt_encoded = encode_pre(full_prompt)
-
     visible_closeout = gen_visible_closeout(sid, items, next_session, next_title)
     updated = session.get("updated", today_iso())
 
-    return f'''  <article class="session" id="{attr(sid)}" data-status="TODO" data-updated="{attr(updated)}">
+    # ALWAYS render the human-purpose block. Use human_summary if provided;
+    # otherwise auto-build a plain-English sentence from the items in scope.
+    purpose_text = human_summary or session_purpose_fallback(session.get("title", sid), items, items_by_id)
+    eyebrow_label = "What we’re doing" if human_summary else "What this session covers"
+    summary_block = (
+        f'<div class="purpose-eyebrow">{eyebrow_label}</div>'
+        f'<p class="session-summary">{esc(purpose_text)}</p>'
+    )
+
+    deliverable_block = f'<div class="deliverable"><strong>By end of session you’ll have</strong>{esc(deliverable)}</div>' if deliverable else ''
+    rec_label = f"Why {esc(model)}" + (f" · {esc(thinking)} effort" if thinking else "")
+    why_model_block = f'<p class="model-rec"><strong>{rec_label}:</strong> {esc(why_model)}</p>' if why_model else ''
+
+    step = f"Session {idx + 1} of {total}"
+
+    next_btn = ""
+    if next_session:
+        next_btn = f'<a href="#{next_session}" class="btn-secondary" title="Jump to {next_session.upper()}">Open next {esc(next_session.upper())} →</a>'
+
+    picker_str = esc(model) + (f" · {esc(thinking)} effort" if thinking else "")
+    actions_html = f'''    <div class="session-actions">
+      <span class="actions-label">Start session</span>
+      <button class="btn-primary" data-target="prompt-{attr(sid)}">Copy prompt</button>
+      <a href="#{sid}" class="btn-secondary">Jump to card</a>
+      {next_btn}
+      <span class="picker-hint" style="margin-left:auto;">set Cowork picker → <strong>{picker_str}</strong>, then paste →</span>
+    </div>'''
+
+    agent_pieces = []
+    if agent_instr:
+        agent_pieces.append('<h4>Agent instructions</h4>' + gen_agent_instructions(agent_instr))
+    agent_pieces.append(f'''<h4>Full prompt (sent to Claude)</h4>
+        <div class="prompt-block">
+          <div class="prompt-header">
+            <span class="prompt-label">Prompt</span>
+            <button class="copy-btn" data-target="prompt-{attr(sid)}">Copy</button>
+          </div>
+<pre class="prompt-text" id="prompt-{attr(sid)}">{prompt_encoded}</pre>
+        </div>''')
+    agent_pieces.append("<h4>Closeout (mirrors what’s appended to the prompt)</h4>" + visible_closeout)
+
+    agent_spec = f'''
+    <details class="agent-spec" data-role="agent-spec">
+      <summary><span class="notes-label">Agent spec · prompt + closeout</span> <span class="agent-tag">FOR CLAUDE</span></summary>
+      <div class="agent-spec-body">
+      {"".join(agent_pieces)}
+      </div>
+    </details>'''
+
+    return f'''  <article class="session" id="{attr(sid)}" data-status="TODO" data-model-family="{attr(fam)}" data-thinking="{attr(thinking)}" data-updated="{attr(updated)}">
+    <div class="session-step">{esc(step)}</div>
     <header class="item-head">
       <span class="id-tag id-session">{esc(sid.upper())}</span>
       <h3 class="title">{esc(session["title"])}</h3>
       <span class="pill status-TODO">TODO</span>
-      <span class="chip model-{attr(model_lower)}">{esc(model)}</span>
-      {f'<span class="chip">{esc(effort)}</span>' if effort else ''}
+      <span class="chip model-chip model-{attr(fam)}" data-model-family="{attr(fam)}">{esc(model)}</span>
+      {f'<span class="chip chip-thinking" data-effort="{attr(thinking)}">{esc(thinking)} effort</span>' if thinking else ''}
+      {f'<span class="chip chip-effort">{esc(effort)}</span>' if effort else ''}
     </header>
-    {f'<p class="model-rec"><strong>Why {esc(model)}:</strong> {esc(why_model)}</p>' if why_model else ''}
-    <p class="session-items"><strong>Items:</strong> {item_links}</p>
-    <div class="prompt-block">
-      <div class="prompt-header"><span class="prompt-label">Prompt to paste into a fresh Cowork session</span><button class="copy-btn" data-target="prompt-{attr(sid)}">Copy</button></div>
-<pre class="prompt-text" id="prompt-{attr(sid)}">{prompt_encoded}</pre>
-    </div>
-{visible_closeout}    <details class="notes"><summary>Notes (0)</summary><div class="notes-content"><span class="empty">No notes yet.</span></div></details>
+    {summary_block}
+    {deliverable_block}
+    <p class="session-items"><strong>Items in scope:</strong> {item_links}</p>
+    {why_model_block}
+{actions_html}
+{agent_spec}
+    <details class="notes"><summary><span class="notes-label">Notes (0)</span></summary><div class="notes-content"><span class="empty">No notes yet.</span></div></details>
   </article>
 '''
 
-def gen_sessions_block(sessions):
-    """Generate all session articles."""
-    return '\n'.join(gen_session_article(s, sessions, i) for i, s in enumerate(sessions))
+
+def gen_sessions_block(sessions, items_by_id=None):
+    return '\n'.join(gen_session_article(s, sessions, i, items_by_id) for i, s in enumerate(sessions))
 
 # --------------------------------------------------------------------------
-# Plan Achievement infographics (5 templates)
+# Plan Achievement infographics (5 templates) — unchanged from previous version
 # --------------------------------------------------------------------------
-INFOGRAPHIC_RENDERERS = {}  # type -> JS function string
-
 def infographic_phase_journey_data_js(info):
-    """Inject PHASES + ANCHORS for phase-journey template."""
     phases = info.get("phases", [])
     anchor_now = info.get("anchor_now", {"name": "Now", "tagline": ""})
     anchor_goal = info.get("anchor_goal", {"name": "Goal", "tagline": ""})
@@ -369,14 +645,11 @@ INFOGRAPHIC_DATA_JS = {
 }
 
 def gen_plan_achievement_section(spec):
-    """Generate the Plan Achievement HTML section. Same shell for all 5 templates;
-    the SVG container is filled by JS based on INFOGRAPHIC_TYPE."""
     info = spec["infographic"]
     title_html = info.get("title", "Plan Achievement")
     eyebrow = info.get("eyebrow", "Plan Achievement · Visual Story")
     narrative = info.get("narrative", "")
 
-    # Pick SVG viewBox based on template (custom uses spec-supplied)
     viewbox = info.get("viewBox") or {
         "phase-journey":   "0 0 1200 240",
         "maturity-ladder": "0 0 800 460",
@@ -386,18 +659,14 @@ def gen_plan_achievement_section(spec):
         "custom":          "0 0 1200 320",
     }.get(info["type"], "0 0 1200 240")
 
-    # For custom type, embed the user-supplied SVG markup directly inside the <svg> shell.
-    # Accept either svg_inline (raw string) or svg_inline_file (path to standalone .svg).
     inner_svg = ""
     if info["type"] == "custom":
         if info.get("svg_inline_file"):
             svg_path = Path(info["svg_inline_file"])
             if not svg_path.is_absolute():
-                # Resolve relative to the spec file's directory if available, else CWD
                 svg_path = Path.cwd() / svg_path
             if svg_path.exists():
                 inner_svg = svg_path.read_text()
-                # Strip leading XML/HTML comments — keep just the SVG content
                 inner_svg = re.sub(r'^<!--.*?-->', '', inner_svg, flags=re.DOTALL).strip()
             else:
                 inner_svg = f'<text x="20" y="40" fill="red">SVG file not found: {svg_path}</text>'
@@ -422,11 +691,10 @@ def gen_plan_achievement_section(spec):
   <svg class="phase-journey" id="phase-journey" viewBox="{viewbox}" preserveAspectRatio="xMidYMid meet"
        aria-label="Plan achievement infographic">{inner_svg}</svg>
 
-  {f'<div class="achievement-narrative"><strong>The story:</strong> {esc(narrative)}</div>' if narrative else ''}
+  {f'<div class="achievement-narrative"><strong>The story</strong>{esc(narrative)}</div>' if narrative else ''}
 </section>'''
 
 def load_infographic_renderers_js():
-    """Load JS render functions for all 5 infographic templates from assets/infographics/."""
     out = []
     info_dir = SKILL_DIR / "assets" / "infographics"
     for name in ["phase-journey", "maturity-ladder", "hub-spoke", "before-after", "pillars", "custom"]:
@@ -439,12 +707,7 @@ def load_infographic_renderers_js():
                        f"svg.innerHTML = '<text x=\"50\" y=\"50\" fill=\"red\">{name} renderer missing</text>'; }}")
     return "\n\n".join(out)
 
-# --------------------------------------------------------------------------
-# JS helper that picks the right renderer based on INFOGRAPHIC_TYPE
-# --------------------------------------------------------------------------
 RENDER_DISPATCH_JS = """
-    // Dispatcher: pick the right renderer based on INFOGRAPHIC_TYPE
-    // Renderers and data constants are in the same IIFE scope so they share a closure.
     function renderPhaseJourney(itemsArr) {
       const svg = document.getElementById('phase-journey');
       if (!svg) return;
@@ -463,6 +726,16 @@ RENDER_DISPATCH_JS = """
       } else {
         svg.innerHTML = '<text x="20" y="40" fill="currentColor">Unknown infographic type: ' + type + '</text>';
       }
+
+      // Overall % big number
+      const pctEl = document.getElementById('ach-overall-pct');
+      if (pctEl) {
+        const total = itemsArr.length;
+        let done = 0;
+        itemsArr.forEach(it => { if ((it.dataset.status || 'TODO') === 'DONE') done++; });
+        const pct = total > 0 ? Math.round((done/total)*100) : 0;
+        pctEl.textContent = pct + '%';
+      }
     }
 """
 
@@ -474,8 +747,6 @@ def build(spec, out_path, project_root=None):
 
     template = TEMPLATE_PATH.read_text()
 
-    # Inject a "PLAN_LOCATION" comment at the top of <main> so any future Claude
-    # opening the file sees where it lives + how to find related project context.
     abs_path = str(out_path.resolve())
     if project_root:
         try:
@@ -496,13 +767,11 @@ def build(spec, out_path, project_root=None):
     )
     template = template.replace("<main>\n", f"<main>{location_comment}\n", 1)
 
-    # Build item-to-session map (for back-links)
     item_to_session = {}
     for s in spec["sessions"]:
         for iid in s["items"]:
             item_to_session[iid] = s["id"]
 
-    # Title + meta
     template = template.replace("{{PLAN_TITLE}}", esc(spec["title"]))
     meta_line = spec.get("subtitle", "")
     if "meta" in spec:
@@ -511,39 +780,35 @@ def build(spec, out_path, project_root=None):
         meta_line = f"{len(spec['sessions'])} sessions · {len(spec['items'])} items"
     template = template.replace("{{PLAN_META_LINE}}", meta_line)
 
-    # First session info (for Up Next default render — JS overrides)
     first_sess = spec["sessions"][0] if spec["sessions"] else {"id": "s01", "title": "First session", "model": "Sonnet", "effort": ""}
     template = template.replace("{{FIRST_SESSION_TITLE}}",
                                 f"{first_sess['id'].upper()} — {esc(first_sess['title'])}")
-    template = template.replace("{{FIRST_SESSION_MODEL}}", esc(first_sess.get("model", "Sonnet")))
-    template = template.replace("{{FIRST_SESSION_EFFORT}}", esc(first_sess.get("effort", "")))
+    fs_model = esc(first_sess.get("model", "Sonnet"))
+    fs_thinking = normalize_thinking(first_sess.get("thinking", ""))
+    fs_effort = esc(first_sess.get("effort", ""))
+    fs_meta = " · ".join(p for p in [fs_model, (f"{esc(fs_thinking)} effort" if fs_thinking else ""), fs_effort] if p)
+    template = template.replace("{{FIRST_SESSION_META}}", fs_meta)
     template = template.replace("{{FIRST_SESSION_ID}}", attr(first_sess["id"]))
 
-    # Session plan section-blurb + comment-block count (FU-01 fix 2026-05-14: was hardcoded stale strings)
     session_plan_blurb = f"{len(spec['sessions'])} sessions · {len(spec['items'])} items"
     template = template.replace("{{SESSION_PLAN_BLURB}}", session_plan_blurb)
     template = template.replace("{{SESSION_TOTAL_COUNT}}", str(len(spec["sessions"])))
-    template = template.replace("{{ITEM_TOTAL_COUNT}}", str(len(spec["items"])))
 
-    # Generate fragments
     session_strip = gen_session_strip(spec["sessions"])
     cat_chips = gen_category_filter_chips(spec["categories"])
     cats_array = gen_cats_array_js(spec["categories"])
     cat_colors = gen_category_colors_css(spec["categories"])
     plan_achievement = gen_plan_achievement_section(spec)
-    sessions_html = gen_sessions_block(spec["sessions"])
+    items_by_id = {it["id"]: it for it in spec["items"]}
+    sessions_html = gen_sessions_block(spec["sessions"], items_by_id)
     cat_sections = "\n".join(gen_category_section(c, spec["items"], item_to_session) for c in spec["categories"])
 
-    # Infographic — data + renderers all injected at INSERT_INFOGRAPHIC_RENDERERS marker
-    # so they share the IIFE closure scope. Renderers reference data constants directly.
     info_type = spec["infographic"]["type"]
     info_data_js = INFOGRAPHIC_DATA_JS[info_type](spec["infographic"])
-    # Convert window.render_* declarations to local function declarations so they live in IIFE scope
     renderers_raw = load_infographic_renderers_js()
     renderers_local = re.sub(r'window\.render_(\w+)\s*=\s*function', r'function render_\1', renderers_raw)
     infographic_full_js = info_data_js + "\n" + renderers_local + "\n" + RENDER_DISPATCH_JS
 
-    # Replace markers
     template = template.replace("<!-- INSERT_SESSION_STRIP -->", session_strip)
     template = template.replace("<!-- INSERT_PLAN_ACHIEVEMENT -->", plan_achievement)
     template = template.replace("<!-- INSERT_CATEGORY_FILTER_CHIPS -->", cat_chips)
@@ -561,8 +826,6 @@ def build(spec, out_path, project_root=None):
     return out_path
 
 def register_plan_in_project(out_path, spec, project_root):
-    """Register the plan in the project's _plans_index.md so future Claude sessions can find it.
-    Returns the snippet to suggest adding to CLAUDE.md."""
     project_root = Path(project_root).resolve()
     index_path = project_root / "_plans_index.md"
     rel_path = out_path.resolve().relative_to(project_root) if out_path.resolve().is_relative_to(project_root) else out_path.resolve()
@@ -572,27 +835,21 @@ def register_plan_in_project(out_path, spec, project_root):
     n_sessions = len(spec["sessions"])
     n_items = len(spec["items"])
 
-    # Create index if missing, else append/update entry
     if index_path.exists():
         body = index_path.read_text()
     else:
         body = ("# Active Plans\n\n"
                 "This file lists all plan dashboards in this project. Each plan is a self-contained\n"
                 "HTML file built by the `plan-builder` skill. To execute a session: open the plan,\n"
-                "find the session card, copy its prompt, paste into a fresh Cowork session. To\n"
+                "find the session card, click 'Copy prompt', paste into a fresh Cowork session. To\n"
                 "update progress: read the plan's Operating Manual at the top of the file.\n\n"
                 "## Plans\n\n")
 
-    # Append/update entry — keyed by file path
     entry = f"- **[{title}]({rel_path})** · {n_sessions} sessions · {n_items} items · created {today}\n"
-    # Remove existing entry for this file if present
-    pattern = re.escape(f"]({rel_path})")
     body = re.sub(rf'^- \*\*\[[^\]]+\]\({re.escape(str(rel_path))}\).*\n', '', body, flags=re.MULTILINE)
     body = body.rstrip() + "\n" + entry
-
     index_path.write_text(body)
 
-    # Snippet for CLAUDE.md / handoff
     snippet = (f"**Active plan:** [{title}]({rel_path}) · "
                f"{n_sessions} sessions · execute via plan-builder protocol · "
                f"see also `_plans_index.md`")
@@ -605,8 +862,7 @@ def main():
     parser.add_argument("spec", help="Path to plan spec JSON file")
     parser.add_argument("output", help="Path to output HTML file")
     parser.add_argument("--register-in", metavar="PROJECT_ROOT",
-                        help="Register the plan in <PROJECT_ROOT>/_plans_index.md so future Claude sessions can find it. "
-                             "Recommended: pass the project root the user is working in.")
+                        help="Register the plan in <PROJECT_ROOT>/_plans_index.md.")
     args = parser.parse_args()
 
     spec_path = Path(args.spec)

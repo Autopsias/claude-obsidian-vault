@@ -33,10 +33,10 @@ See `../../plan-builder-workspace/test-spec.json` (if present) for a full Q4-pro
     {"id": "auto-02", "title": "Predictive anomaly alerts",  "category": "auto",    "priority": "P2", "effort": "L"}
   ],
   "sessions": [
-    {"id": "s01", "title": "Logs foundation",          "model": "Sonnet", "items": ["logs-01", "logs-02"],            "prompt": "..."},
-    {"id": "s02", "title": "Metrics + SLOs",           "model": "Sonnet", "items": ["met-01", "met-02"],              "prompt": "..."},
-    {"id": "s03", "title": "Tracing rollout",          "model": "Sonnet", "items": ["tr-01", "tr-02"],                "prompt": "..."},
-    {"id": "s04", "title": "Automation + alerting",    "model": "Opus",   "items": ["auto-01", "auto-02"],            "prompt": "..."}
+    {"id": "s01", "title": "Logs foundation",       "model": "Sonnet 4.6", "thinking": "Medium", "items": ["logs-01", "logs-02"], "why_model": "Well-scoped setup work — Sonnet 4.6 at Medium is the cost-efficient fit.", "prompt": "..."},
+    {"id": "s02", "title": "Metrics + SLOs",        "model": "Opus 4.8",   "thinking": "High",   "items": ["met-01", "met-02"],   "why_model": "SLO design needs judgement about what to measure — Opus 4.8 at High.", "prompt": "..."},
+    {"id": "s03", "title": "Tracing rollout",       "model": "Opus 4.8",   "thinking": "Extra",  "items": ["tr-01", "tr-02"],     "why_model": "Cross-service instrumentation with heavy tool-calling — Extra for agentic depth.", "prompt": "..."},
+    {"id": "s04", "title": "Automation + alerting", "model": "Opus 4.8",   "thinking": "Max",    "items": ["auto-01", "auto-02"], "why_model": "Auto-rollback logic is high-stakes and easy to get subtly wrong — Max.", "prompt": "..."}
   ],
   "infographic": {
     "type": "maturity-ladder",
@@ -130,3 +130,59 @@ Skeleton shown — fill in items and prompts:
 5. Does the plan rest on **N foundational workstreams** that together support a goal? → **pillars**
 
 When unsure, **phase-journey** is the safe default — it accommodates most plans.
+
+## Aurora edition — dual-layer item + session example
+
+Demonstrates the dual-layer fields (`human_summary`, `deliverable`, `agent_instructions`, `schema`, `code`) plus the per-session `model` + `thinking` pair and a combined `why_model`. Drop these into any item or session in an existing spec; they all degrade gracefully if omitted.
+
+```json
+{
+  "items": [
+    {
+      "id": "be-01",
+      "title": "Add invite-by-email endpoint",
+      "category": "backend",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Admins can email a teammate an invite link instead of doing the create-user-and-share-password dance. Cuts onboarding from 10 minutes to one click.",
+      "deliverable": "POST /api/v1/invites returns a token-bearing magic link; recipient lands on /accept-invite which provisions the account.",
+      "why": "Manual user creation is the #1 onboarding complaint in NPS verbatims.",
+      "owner": "Backend",
+      "target": "End of Q3",
+      "touches": "services/auth/invites.go, web/pages/accept-invite.tsx, db/migrations/0042_invites.sql",
+      "agent_instructions": [
+        "Add the migration for the invites table per the schema below.",
+        "Implement POST /api/v1/invites returning 201 with {token, expires_at}.",
+        "Wire a worker that emails the magic link via SendGrid (template ID INV-001).",
+        "Add /accept-invite page that exchanges token for session and redirects to /dashboard."
+      ],
+      "schema": {
+        "lang": "sql",
+        "code": "CREATE TABLE invites (\n  id            UUID PRIMARY KEY,\n  inviter_id    UUID NOT NULL REFERENCES users(id),\n  email         CITEXT NOT NULL,\n  token         TEXT NOT NULL UNIQUE,\n  expires_at    TIMESTAMPTZ NOT NULL,\n  accepted_at   TIMESTAMPTZ,\n  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()\n);\nCREATE INDEX idx_invites_token ON invites(token);"
+      },
+      "code": {
+        "lang": "ts",
+        "code": "interface InviteResponse {\n  token: string;\n  expires_at: string;  // ISO 8601\n  invite_url: string;  // e.g. https://app.example.com/accept-invite?t=...\n}"
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "id": "s04",
+      "title": "Invite flow end-to-end",
+      "model": "Sonnet 4.6",
+      "thinking": "Medium",
+      "effort": "~3h",
+      "items": ["be-01", "fe-01"],
+      "human_summary": "Stand up the invite-by-email flow end-to-end. Admins click 'Invite' in the dashboard, type an email, the teammate gets a link, clicks it, lands inside.",
+      "deliverable": "A real admin can invite a real teammate and watch them join the workspace. CI passes; staging demo recorded.",
+      "why_model": "Mechanical CRUD + template wiring — well-defined, so Sonnet 4.6 at Medium effort is the cost-efficient fit.",
+      "prompt": "Execute SESSION S04 — Invite flow end-to-end.\n\nItems: BE-01 (backend endpoint + table) and FE-01 (frontend dashboard button + accept page).\n\n1. Run the migration in db/migrations/0042_invites.sql.\n2. Implement BE-01 following its agent_instructions and schema.\n3. Implement FE-01: add the 'Invite teammate' modal to the admin dashboard, build the /accept-invite page.\n4. Add an integration test that drives the full flow with a real email captured by mailhog in CI.\n5. Record a 30-second screencast for the staging demo channel."
+    }
+  ]
+}
+```
+
+Notice that the **prompt body** doesn't repeat the schema or the dev-step bullets — those live in the items' `agent_instructions` / `schema` / `code` fields, which the executing Claude can read by opening the item articles in the same HTML file. This keeps the prompt focused on session-level orchestration and lets the per-item detail sit next to its item.
+
+For per-session **model + thinking-effort** choices, see `model-effort-guidance.md`. Every session above sets a `model` + `thinking` pair the user dials into the Cowork picker before pasting, and explains the pair in one sentence in `why_model`.
