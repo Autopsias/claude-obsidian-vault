@@ -130,4 +130,18 @@ case "$REL" in
     ;;
 esac
 
+# ── GitHub mirror push ──────────────────────────────────
+# Fire-and-forget background push so the agent never blocks on network.
+# 10s timeout guards against hung auth prompts. Errors silenced —
+# git push failures should be caught by your daily health check next day.
+# Only fires if origin is configured AND there is at least one new local
+# commit ahead of origin/main. Push only the main branch.
+if git config --get remote.origin.url >/dev/null 2>&1; then
+  AHEAD=$(git rev-list --count "@{u}..HEAD" 2>/dev/null || echo 0)
+  if [ "${AHEAD:-0}" -gt 0 ]; then
+    ( timeout 10 git push origin main >/dev/null 2>&1 || true ) &
+    disown 2>/dev/null || true
+  fi
+fi
+
 exit 0

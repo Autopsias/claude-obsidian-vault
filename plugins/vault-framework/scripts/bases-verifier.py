@@ -87,12 +87,34 @@ KNOWN_TYPES: frozenset[str] = frozenset({
     "eval", "inbox", "daily", "template", "base", "system",
 })
 
-# Types that may carry a `confidence:` field (P-4 optional, added 2026-05-14
-# / FM-01 of Framework Remediation & Karpathy Adoption plan S05).
+# P-4 strict reading: closed type vocabulary applies to typed zones only.
+# Auto-write zones (00 Inbox/, 80 Daily/, 99 Workspace/) carry descriptive
+# `type:` values from pipelines / authors that are legitimate but outside
+# the closed vocabulary (e.g. `audit`, `review`, `email-source`,
+# `test-report`, `briefing`). Vault-root files (`_index.md`,
+# `Welcome.md`) are not in any typed zone. Skip them all from the
+# type-vocab check. Schema/Bases enforcement still fires on these files
+# (Bases query by `type` value — a file with `type: audit` simply won't
+# appear in any Base view; that's intentional, not a vault defect).
+# Added 2026-05-25 — galp-vault-health round-2 remediation.
+TYPE_VOCAB_SKIP_PREFIXES: tuple[str, ...] = (
+    "00 Inbox/", "80 Daily/", "99 Workspace/",
+)
+
+# Types that may carry a `confidence:` field (P-4 optional, added S05/FM-01).
 CONFIDENCE_TYPES: frozenset[str] = frozenset({"source", "decision", "meeting", "concept"})
 
-# Valid values for the `stale:` tri-state field (P-4 optional, added 2026-05-14
-# / FM-02 of Framework Remediation & Karpathy Adoption plan S05).
+# Valid values for `claim_type:` (P-4 optional, added S07/MA-03, 2026-05-16).
+CLAIM_TYPE_VALID_VALUES: frozenset[str] = frozenset({"evidence", "inference", "hypothesis"})
+
+# Bases-bound types where absent `claim_type` is a P-10 quality signal.
+# (NOT an error — backfill happens organically via the promotion ritual.)
+# All primary Bases-bound types except the unbound set.
+CLAIM_TYPE_QUALITY_TYPES: frozenset[str] = frozenset({
+    "person", "company", "project", "meeting", "source", "concept", "decision",
+})
+
+# Valid values for the `stale:` tri-state field (P-4 optional, added S05/FM-02).
 STALE_VALID_VALUES: frozenset[str] = frozenset({"pending", "confirmed", "cleared"})
 
 # Types that are valid but not bound to any .base — Bases checks skipped.
@@ -115,6 +137,10 @@ SKIP_DIRS: frozenset[str] = frozenset({
     # Staging folder for scheduled-task SKILL.md files; SKILL.md frontmatter
     # uses a different schema (Anthropic agent skill spec, not P-4).
     "_galp_vault_scheduled_tasks_staging",
+    # Skill-package reference vault — example/scaffold files that use
+    # placeholder schema (not live vault content). Added 2026-05-18 after
+    # health check surfaced 83 spurious schema-fail entries from these files.
+    "_skill_packages",
 })
 
 # Filenames never checked.
@@ -485,6 +511,9 @@ class Verification:
     type_violations: list[FileReport] = field(default_factory=list)
     yaml_violations: list[tuple[str, str]] = field(default_factory=list)  # (rel, error)
     orphan_wikilinks: list[tuple[str, str]] = field(default_factory=list)  # (rel, target)
+    # P-10 quality signals — not errors; backfill happens organically.
+    # (rel, type_value, signal_description)
+    quality_signals: list[tuple[str, str, str]] = field(default_factory=list)
 
     def per_base_counts(self) -> dict[str, tuple[int, int]]:
         """{base_name: (pass_count, fail_count)}."""
@@ -574,8 +603,14 @@ def verify_vault(vault: Path) -> Verification:
                 # frontmatter linter handles it.
                 pass
             elif type_value not in KNOWN_TYPES:
-                report.violations.append(f"type '{type_value}' outside closed P-4 vocabulary")
-                v.type_violations.append(report)
+                # P-4 strict reading: closed type vocab applies to typed
+                # zones only. Skip auto-write zones + vault-root files.
+                # Vault-root files have no "/" in their rel path.
+                in_skip_zone = rel.startswith(TYPE_VOCAB_SKIP_PREFIXES)
+                at_vault_root = "/" not in rel
+                if not (in_skip_zone or at_vault_root):
+                    report.violations.append(f"type '{type_value}' outside closed P-4 vocabulary")
+                    v.type_violations.append(report)
                 # Continue to wikilink check; do not skip the file entirely.
             else:
                 # Type is in the closed vocabulary. Check Bases binding.
@@ -604,7 +639,7 @@ def verify_vault(vault: Path) -> Verification:
                         f"type '{type_value}' has no matching .base file"
                     )
 
-            # --- Optional-field validation (P-4, S05/FM-03) ---------------------
+            # --- Optional-field validation (P-4, S05/FM-03) -----------------
             # `confidence:` — if present, must be float 0.0–1.0.
             # Applicable only to CONFIDENCE_TYPES; absent = pass.
             if "confidence" in fm:
@@ -641,7 +676,32 @@ def verify_vault(vault: Path) -> Verification:
                             f"stale='{stale_raw}' not in valid enum "
                             f"{sorted(STALE_VALID_VALUES)} (P-4)"
                         )
-            # --------------------------------------------------------------------
+
+            # `claim_type:` — P-10 quality signal (P-4, S07/MA-03, 2026-05-16).
+            # Two-pass check:
+            # (a) If present: validate the value — invalid value = schema violation.
+            # (b) If absent on a CLAIM_TYPE_QUALITY_TYPES note: quality signal (NOT a
+            #     violation). Backfill happens organically via the P-10 promotion ritual.
+            if "claim_type" in fm:
+                ct_raw = fm.get("claim_type")
+                if ct_raw is None or (isinstance(ct_raw, str) and not str(ct_raw).strip()):
+                    pass  # absent / null → pass
+                else:
+                    ct_str = str(ct_raw).strip().strip("'\"").lower()
+                    if ct_str not in CLAIM_TYPE_VALID_VALUES:
+                        report.violations.append(
+                            f"claim_type='{ct_raw}' not in valid enum "
+                            f"{sorted(CLAIM_TYPE_VALID_VALUES)} (P-4)"
+                        )
+            elif type_value and type_value in CLAIM_TYPE_QUALITY_TYPES:
+                # claim_type absent — record as a quality signal, NOT a violation.
+                v.quality_signals.append((
+                    rel,
+                    type_value,
+                    f"claim_type absent (zone default applies); "
+                    f"backfill during next P-10 promotion ritual",
+                ))
+            # ----------------------------------------------------------------
 
             # Wikilink resolution — anywhere in frontmatter.
             for target in collect_wikilinks(fm):
@@ -664,7 +724,7 @@ def render_report(v: Verification, vault: Path) -> str:
     lines.append("name: Bases Verification Report")
     lines.append(
         "description: Per-Base schema-conformance and wikilink-integrity audit "
-        "for the live Galp Vault Bases. Produced by 90 System/_bases_verifier.py."
+        "for the live vault Bases. Produced by 90 System/_bases_verifier.py."
     )
     lines.append("type: log")
     lines.append("cadence: weekly")
@@ -798,6 +858,39 @@ def render_report(v: Verification, vault: Path) -> str:
             lines.append(f"- `{rel}` — unresolved: {', '.join(f'`{t}`' for t in tgts)}")
         lines.append("")
 
+    # --- P-10 quality signals (claim_type absent) ---
+    lines.append("## P-10 quality signals — claim_type absent")
+    lines.append("")
+    lines.append(
+        "These notes are missing the optional `claim_type:` frontmatter field "
+        "(added P-4 S07/MA-03). This is **not an error** — backfill happens organically "
+        "during the P-10 promotion ritual. Zone defaults apply in the meantime: "
+        "source/meeting/decision/person/company/project → `evidence`; concept → `inference`."
+    )
+    lines.append("")
+    if not v.quality_signals:
+        lines.append("All Bases-bound typed notes carry `claim_type:` — nothing to backfill.")
+        lines.append("")
+    else:
+        # Group by type for readability
+        by_type: dict[str, list[str]] = {}
+        for rel, type_val, _detail in v.quality_signals:
+            by_type.setdefault(type_val, []).append(rel)
+        for tv in sorted(by_type):
+            rels = sorted(by_type[tv])
+            lines.append(f"**type: {tv}** ({len(rels)} notes missing `claim_type:`)")
+            # Cap display at 20 per type to avoid bloat; this section is informational.
+            for r in rels[:20]:
+                lines.append(f"  - `{r}`")
+            if len(rels) > 20:
+                lines.append(f"  - … and {len(rels) - 20} more")
+            lines.append("")
+        lines.append(
+            f"**Total quality signals: {len(v.quality_signals)}** — "
+            "address during next P-10 promotion ritual, not in bulk."
+        )
+        lines.append("")
+
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -815,6 +908,7 @@ def render_stdout_summary(v: Verification, report_path: Path) -> str:
     out.append(f"Type-vocabulary violations: {len(v.type_violations)}")
     out.append(f"Malformed YAML: {len(v.yaml_violations)}")
     out.append(f"Orphan wikilinks: {len(v.orphan_wikilinks)}")
+    out.append(f"P-10 quality signals (claim_type absent, not errors): {len(v.quality_signals)}")
     out.append(f"Report: {report_path}")
     return "\n".join(out)
 
@@ -1028,7 +1122,7 @@ def render_bases_report(bases: list[BaseSchema], checks: list[BaseCheck], vault:
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Verify Galp Vault Bases conformance.")
+    ap = argparse.ArgumentParser(description="Verify vault Bases conformance.")
     ap.add_argument("--strict", action="store_true",
                     help="exit 1 if any violation")
     ap.add_argument("--bases", action="store_true",
